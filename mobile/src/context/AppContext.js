@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import {
   CANDIDATES,
@@ -10,6 +10,7 @@ import {
   WHY_NOT_DEFAULT,
   genDraft,
 } from '../data/mockData';
+import { loadProfile, saveProfile } from '../services/storage';
 import { colors } from '../theme/theme';
 
 const AppContext = createContext(null);
@@ -44,8 +45,25 @@ export function AppProvider({ children }) {
   const [selCandidate, setSelCandidate] = useState(null);
   const [emailLang, setEmailLang] = useState('vi');
   const [copied, setCopied] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   const isInvestor = role === 'investor';
+
+  useEffect(() => {
+    let cancelled = false;
+    loadProfile().then((saved) => {
+      if (cancelled || !saved) {
+        setProfileLoaded(true);
+        return;
+      }
+      if (saved.role) setRole(saved.role);
+      if (saved.form) setForm((f) => ({ ...f, ...saved.form }));
+      if (saved.status) setStatus(saved.status);
+      if (saved.savedAt) setSavedAt(saved.savedAt);
+      setProfileLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const doAuth = useCallback(() => {
     if (!authEmail.trim() || !authPassword.trim()) {
@@ -114,19 +132,22 @@ export function AppProvider({ children }) {
   }, [validity, isInvestor]);
 
   const saveDraft = useCallback(() => {
+    const savedTime = Date.now();
     setStatus('draft');
-    setSavedAt(Date.now());
-  }, []);
+    setSavedAt(savedTime);
+    saveProfile({ role, form, status: 'draft', savedAt: savedTime });
+  }, [role, form]);
 
   const markReady = useCallback(() => {
     if (allValid) {
       setStatus('ready');
       setShowErrors(false);
+      saveProfile({ role, form, status: 'ready', savedAt: Date.now() });
       return true;
     }
     setShowErrors(true);
     return false;
-  }, [allValid]);
+  }, [allValid, role, form]);
 
   const invSwap = isInvestor;
   const activeDataset = useMemo(() => {
@@ -208,6 +229,7 @@ export function AppProvider({ children }) {
     authed, authMode, authEmail, authPassword, authError,
     setAuthEmail, setAuthPassword, doAuth, logout, toggleAuthMode,
 
+    profileLoaded,
     role, isInvestor, chooseRole,
     status, showErrors, savedAt, allValid, validity, missingLabels,
     form, setField, toggleSector, saveDraft, markReady,
@@ -221,6 +243,7 @@ export function AppProvider({ children }) {
     SECTORS,
   }), [
     accent, authed, authMode, authEmail, authPassword, authError, doAuth, logout, toggleAuthMode,
+    profileLoaded,
     role, isInvestor, chooseRole,
     status, showErrors, savedAt, allValid, validity, missingLabels,
     form, setField, toggleSector, saveDraft, markReady,

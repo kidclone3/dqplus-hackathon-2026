@@ -89,6 +89,13 @@ export function getMatches({ userId, role }) {
   return request(path + '?limit=50');
 }
 
+// Composite ranked list, forwarded by the gateway to the Python matching API
+// (ai-data-platform), as opposed to the role-specific pgvector + attribute scoring above.
+export function getAllMatches({ startupId } = {}) {
+  const query = startupId ? '?startup_id=' + encodeURIComponent(startupId) : '';
+  return request(BACKEND + '/matches' + query);
+}
+
 const INVESTOR_TYPES = {
   vc: 'Venture Capital',
   angel: 'Angel Investor',

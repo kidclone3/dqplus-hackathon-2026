@@ -3,6 +3,7 @@ const cors = require("cors");
 const swaggerUi = require("swagger-ui-express");
 const authRouter = require("./routes/auth.routes");
 const profileRouter = require("./routes/profile.routes");
+const matchesRouter = require("./routes/matches.routes");
 const errorHandler = require("./middleware/errorHandler");
 const { sequelize } = require("./models");
 const swaggerSpec = require("./config/swagger");
@@ -27,6 +28,7 @@ app.get("/health", async (req, res) => {
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/auth", authRouter);
 app.use("/profiles", profileRouter);
+app.use("/matches", matchesRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Not found" });

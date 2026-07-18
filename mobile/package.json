@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo-google-fonts/hanken-grotesk": "^0.4.3",
     "@expo-google-fonts/newsreader": "^0.4.1",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.3.11",
     "@react-navigation/native-stack": "^7.18.3",
     "expo": "^54.0.0",
@@ -14,6 +15,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-nfc-manager": "^3.17.2",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-web": "^0.21.0"

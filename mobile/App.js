@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './src/context/AppContext';
 import AuthScreen from './src/screens/AuthScreen';
 import ProfileFormScreen from './src/screens/ProfileFormScreen';
+import ProfileCardScreen from './src/screens/ProfileCardScreen';
 import MatchesScreen from './src/screens/MatchesScreen';
 import MatchDetailScreen from './src/screens/MatchDetailScreen';
 import { colors } from './src/theme/theme';
@@ -30,6 +31,7 @@ function RootNavigator() {
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="ProfileForm">
         <Stack.Screen name="ProfileForm" component={ProfileFormScreen} />
+        <Stack.Screen name="ProfileCard" component={ProfileCardScreen} />
         <Stack.Screen name="Matches" component={MatchesScreen} />
         <Stack.Screen name="MatchDetail" component={MatchDetailScreen} />
       </Stack.Navigator>

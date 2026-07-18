@@ -1,3 +1,4 @@
+import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +9,7 @@ import { StatusPill } from './ui';
 export default function AppHeader() {
   const { accent, status, authEmail, logout } = useApp();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -16,6 +18,9 @@ export default function AppHeader() {
           <Text style={styles.logoText}>V</Text>
         </View>
         <Text style={styles.brandName}>VietNexus</Text>
+        <Pressable onPress={() => navigation.navigate('ProfileCard')} style={styles.cardLink}>
+          <Text style={[styles.cardLinkText, { color: accent }]}>Your card</Text>
+        </Pressable>
       </View>
       <View style={styles.rightRow}>
         <StatusPill ready={status === 'ready'} accent={accent} />
@@ -40,7 +45,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     gap: 10,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+  cardLink: { marginLeft: 2 },
+  cardLinkText: { fontSize: 12.5, fontFamily: fonts.sansSemiBold },
   logo: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   logoText: { color: '#fff', fontFamily: fonts.sansSemiBold, fontSize: 14 },
   brandName: { color: colors.text, fontFamily: fonts.sansSemiBold, fontSize: 15, letterSpacing: -0.2 },
