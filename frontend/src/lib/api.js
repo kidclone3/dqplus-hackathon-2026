@@ -96,44 +96,42 @@ export function getAllMatches({ startupId } = {}) {
   return request(BACKEND + '/matches' + query);
 }
 
-const INVESTOR_TYPES = {
-  vc: 'Venture Capital',
-  angel: 'Angel Investor',
-  cvc: 'Corporate VC',
-  pe: 'Private Equity',
-  'family-office': 'Family Office',
+// Entity types returned by the matching API (ai-data-platform /matches/...).
+const ENTITY_TYPES = {
+  startup: { label: 'Startup', dot: '#3f8f6b' },
+  investor: { label: 'Investor', dot: '#b08636' },
+  corporation: { label: 'Corporation', dot: '#b08636' },
+  university: { label: 'University', dot: '#5b7a9d' },
+  research_institution: { label: 'Research institute', dot: '#5b7a9d' },
 };
 
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const sectorLabel = (s) => {
+  const t = String(s).replace(/_/g, ' ');
+  return t.length <= 2 ? t.toUpperCase() : cap(t);
+};
 
-export function matchToCandidate(m, role) {
-  const a = m.attributes || {};
+// Maps one item of the API's `matches` array — {id, name, type, score, vectorScore,
+// attributeScore, reasons, rationale_en/vi (rerank only), profile.normalized} — onto
+// the candidate shape the Matches/MatchDetail views render.
+export function matchToCandidate(m) {
+  const norm = (m.profile && m.profile.normalized) || {};
   const reasons = m.reasons || [];
-  const base = {
-    userId: m.userId,
+  const entity = ENTITY_TYPES[m.type] || { label: cap(m.type) || 'Partner', dot: '#b08636' };
+  return {
+    userId: m.id,
     score: Math.round(m.score * 100),
     vectorScore: Math.round(m.vectorScore * 100),
     attributeScore: Math.round(m.attributeScore * 100),
     reasons,
-    rationale: reasons.length
-      ? cap(reasons.join(' · '))
-      : 'Ranked by semantic similarity between both profiles.',
-  };
-  if (role === 'investor') {
-    return {
-      ...base,
-      name: a.company_name || 'Unnamed startup',
-      type: 'Startup' + (a.stage ? ' · ' + cap(a.stage) : ''),
-      dot: '#3f8f6b',
-      sectors: (a.industry || []).map(cap),
-    };
-  }
-  return {
-    ...base,
-    name: a.firm_name || 'Unnamed investor',
-    type: INVESTOR_TYPES[a.investor_type] || 'Investor',
-    dot: '#b08636',
-    sectors: (a.sectors || []).map(cap),
+    rationale: m.rationale_en
+      || (reasons.length
+        ? cap(reasons.join(' · '))
+        : 'Ranked by semantic similarity between both profiles.'),
+    name: m.name || 'Unnamed ' + entity.label.toLowerCase(),
+    type: entity.label + (m.type === 'startup' && norm.stage ? ' · ' + cap(norm.stage) : ''),
+    dot: entity.dot,
+    sectors: (norm.sectors || []).map(sectorLabel),
   };
 }
 

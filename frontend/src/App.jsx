@@ -130,7 +130,7 @@ export default function App() {
       }
       setMatchData({
         status: 'ready',
-        candidates: (data.matches || []).map((m) => matchToCandidate(m, role)),
+        candidates: (data.matches || []).map((m) => matchToCandidate(m)),
         error: '',
       });
     } catch (e) {
