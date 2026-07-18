@@ -2,6 +2,7 @@ const app = require('./app');
 const { sequelize } = require('./models');
 
 const port = process.env.PORT || 3000;
+const host = process.env.HOST || '0.0.0.0';
 
 async function start() {
   await sequelize.authenticate();
@@ -9,8 +10,8 @@ async function start() {
     await sequelize.sync();
   }
 
-  app.listen(port, () => {
-    console.log(`Gateway listening on port ${port}`);
+  app.listen(port, host, () => {
+    console.log(`Gateway listening on ${host}:${port}`);
   });
 }
 

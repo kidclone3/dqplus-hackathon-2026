@@ -1,0 +1,120 @@
+.vn-auth-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 32px;
+  background: var(--bg);
+}
+
+.vn-auth-col {
+  width: 100%;
+  max-width: 420px;
+}
+
+.vn-auth-logo {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  justify-content: center;
+  color: var(--ink);
+}
+
+.vn-auth-tile {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font: 600 17px var(--font-ui);
+}
+
+.vn-auth-lockup {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.vn-auth-lockup b {
+  font: 600 18px var(--font-ui);
+  letter-spacing: -0.01em;
+}
+
+.vn-auth-lockup small {
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.vn-auth-h1 {
+  margin: 30px 0 0;
+  text-align: center;
+}
+
+.vn-auth-sub {
+  margin: 12px 0 0;
+  text-align: center;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.vn-auth-card {
+  margin-top: 28px;
+  padding: 28px;
+}
+
+.vn-auth-seg {
+  margin-bottom: 20px;
+}
+
+.vn-auth-error {
+  margin-bottom: 16px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--err-bg-2);
+  color: var(--err-deep);
+  font-size: 13px;
+}
+
+.vn-auth-card .input + .label {
+  margin-top: 16px;
+}
+
+.vn-auth-cta {
+  width: 100%;
+  height: 46px;
+  margin-top: 22px;
+  font-size: 15px;
+}
+
+.vn-auth-demo {
+  width: 100%;
+  height: 46px;
+  margin-top: 12px;
+}
+
+.vn-auth-switch {
+  margin-top: 18px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vn-auth-switch a {
+  font-weight: 600;
+  cursor: pointer;
+  color: inherit;
+}
+
+.vn-auth-switch a:hover {
+  color: var(--text);
+}
+
+.vn-auth-footer {
+  margin: 18px 0 0;
+  text-align: center;
+  color: var(--faint);
+  font-size: 11.5px;
+}
