@@ -144,7 +144,11 @@ async def test_supervisor_recovers_from_mid_job_crash_and_completes_saga(store):
     launcher = _ScriptedLauncher([
         _ScriptedChannel(crash=True),
         _ScriptedChannel(result=_ok(
-            {"entity_type": "startup", "relationships": [], "collection_summary": {}})),
+            {"entity_type": "startup",
+             "profile": {"website": {"value": "https://e2ecrash.example.vn",
+                                     "source_url": "https://e2ecrash.example.vn",
+                                     "confidence": "high"}},
+             "relationships": [], "collection_summary": {"status": "ok"}})),
         _ScriptedChannel(result=_ok(
             {"sectors": ["agritech"], "looking_for": ["funding"], "stage": "seed",
              "description_en": "x", "description_vi": "y"})),

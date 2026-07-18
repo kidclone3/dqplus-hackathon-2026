@@ -23,12 +23,18 @@ import asyncpg
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))  # run directly: `uv run python scripts/bootstrap.py`
 
+from apps.matchmaker.store import MatchmakerStore as Store
 from spine import config
 from spine.ids import entity_id
-from spine.store import Store
 
 MIGRATIONS_DIR = ROOT / "migrations"
 SEED_DIR = ROOT / "seed"
+
+
+def _migration_files() -> list[Path]:
+    """Platform migrations first, then every app's domain migrations (Seam 3)."""
+    return (sorted(MIGRATIONS_DIR.glob("*.sql"))
+            + sorted(ROOT.glob("apps/*/migrations/*.sql")))
 
 
 async def run_migrations(conn: asyncpg.Connection) -> list[str]:
@@ -39,16 +45,19 @@ async def run_migrations(conn: asyncpg.Connection) -> list[str]:
     )
     applied = {r["filename"] for r in await conn.fetch("SELECT filename FROM schema_migrations")}
     newly: list[str] = []
-    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
-        if path.name in applied:
+    for path in _migration_files():
+        key = str(path.relative_to(ROOT))  # namespaced so app/platform names never collide
+        # Legacy DBs recorded the bare basename (e.g. '001_core.sql'); treat those as
+        # applied so an upgrade doesn't re-run 001–003 and leave a duplicate ledger.
+        if key in applied or path.name in applied:
             continue
         async with conn.transaction():
             await conn.execute(path.read_text())
             await conn.execute(
                 "INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING",
-                path.name,
+                key,
             )
-        newly.append(path.name)
+        newly.append(key)
     return newly
 
 

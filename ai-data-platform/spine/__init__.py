@@ -1,1 +1,1 @@
-"""Deterministic spine: transport, store, supervisor, telemetry."""
+"""Deterministic spine primitives: transport, config, ids, telemetry."""

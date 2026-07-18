@@ -2,7 +2,7 @@
 # LocalProcessLauncher, connecting to Postgres at localhost:5432.
 services:
   postgres:
-    image: postgres:16      # swap to pgvector/pgvector:pg16 when EmbeddingMatcher lands
+    image: pgvector/pgvector:pg16   # EmbeddingMatcher needs the vector extension (004_embeddings.sql)
     environment:
       POSTGRES_DB: dealflow
       POSTGRES_USER: dealflow

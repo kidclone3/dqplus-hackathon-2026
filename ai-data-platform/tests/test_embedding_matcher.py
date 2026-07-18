@@ -15,8 +15,8 @@ import math
 
 import pytest
 
-from spine.embedding import EMBEDDING_DIM, embed_text, entity_text
-from spine.matcher.embedding_matcher import attribute_score
+from apps.matchmaker.embedding import EMBEDDING_DIM, embed_text, entity_text
+from apps.matchmaker.matcher.embedding_matcher import attribute_score
 
 
 # ── helpers ────────────────────────────────────────────────────────

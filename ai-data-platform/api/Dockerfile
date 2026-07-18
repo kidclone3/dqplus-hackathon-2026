@@ -6,9 +6,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 WORKDIR /app
 COPY pyproject.toml ./
 COPY spine ./spine
+COPY spindle ./spindle
+COPY apps ./apps
 COPY api ./api
 COPY dashboard ./dashboard
-# schemas/ is read at import time by spine.outreach and spine.sagas (R2); the API crashes on startup without it
+# schemas/ is read at import time by apps.matchmaker.plugin (R2); kept for the app package's completeness
 COPY schemas ./schemas
 
 RUN uv pip install --system asyncpg structlog jsonschema pyyaml fastapi uvicorn

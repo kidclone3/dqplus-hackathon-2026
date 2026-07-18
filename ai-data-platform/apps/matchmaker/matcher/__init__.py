@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from ..ids import slugify
+from spine.ids import slugify
 
 PARTNER_TYPES = ("investor", "corporation", "university", "research_institution")
 

@@ -7,7 +7,7 @@ Covers: direct 1-hop resolution via dst_id, name-slug fallback (the core bug fix
 2-hop paths, target-type filtering, RELATIONAL_KINDS exclusion, unresolvable edges,
 and max_hops bounds.
 """
-from spine.graph import (
+from apps.matchmaker.graph import (
     RELATIONAL_KINDS,
     GraphPath,
     Hop,
