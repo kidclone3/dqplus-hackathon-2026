@@ -120,6 +120,7 @@ export function matchToCandidate(m) {
   const entity = ENTITY_TYPES[m.type] || { label: cap(m.type) || 'Partner', dot: '#b08636' };
   return {
     userId: m.id,
+    entityType: m.type,
     score: Math.round(m.score * 100),
     vectorScore: Math.round(m.vectorScore * 100),
     attributeScore: Math.round(m.attributeScore * 100),

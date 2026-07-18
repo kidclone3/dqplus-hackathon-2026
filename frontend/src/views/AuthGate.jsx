@@ -19,6 +19,7 @@ export default function AuthGate({ onAuthed }) {
 
   const authTitle = mode === 'login' ? 'Enter the ecosystem' : 'Create your account';
   const authCta = mode === 'login' ? 'Sign in' : 'Create account';
+  const authBusyCta = mode === 'login' ? 'Signing in...' : 'Creating account...';
   const authSwitchText = mode === 'login' ? 'New to VietNexus?' : 'Already have an account?';
   const authSwitchLink = mode === 'login' ? 'Create an account' : 'Sign in';
 
@@ -69,6 +70,7 @@ export default function AuthGate({ onAuthed }) {
           </span>
         </div>
 
+        <span className="eyebrow vn-auth-eyebrow rise">Private ecosystem</span>
         <h1 className="serif-h1 vn-auth-h1 rise">{authTitle}</h1>
         <p className="vn-auth-sub rise">
           The ecosystem is private. Sign in to view profiles, signals and matches.
@@ -94,8 +96,6 @@ export default function AuthGate({ onAuthed }) {
             </div>
           )}
 
-          {error && <div className="vn-auth-error">{error}</div>}
-
           <label className="label">Email</label>
           <input
             type="email"
@@ -115,13 +115,20 @@ export default function AuthGate({ onAuthed }) {
             placeholder="Your password"
           />
 
+          {error && (
+            <div className="vn-auth-error" role="alert" aria-live="polite">
+              {error}
+            </div>
+          )}
+
           <button
             type="button"
             className="btn btn-primary vn-auth-cta"
             onClick={doAuth}
             disabled={busy}
+            aria-busy={busy}
           >
-            {authCta}
+            {busy ? authBusyCta : authCta}
           </button>
 
           <div className="vn-auth-switch">
@@ -130,7 +137,7 @@ export default function AuthGate({ onAuthed }) {
         </div>
 
         <p className="vn-auth-footer rise">
-          🔒 Your session is private. Draft data stays with your account.
+          Your session is private. Draft data stays with your account.
         </p>
       </div>
     </div>

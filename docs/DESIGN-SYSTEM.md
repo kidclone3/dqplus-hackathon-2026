@@ -72,14 +72,13 @@ Desaturated by design; do not brighten. Max 1 accent elsewhere.
 
 | Element | Radius |
 |---|---|
-| Landing CTAs, chips, pills, badges | full pill (`999px`) |
-| App buttons (`styles.css .btn`) | 11px |
+| Buttons (all, app + landing), chips, pills, badges | full pill (`999px`) |
 | Inputs / selects | 11px |
 | Small tiles (avatars, "Why now" box, score tile) | 12–16px |
 | Cards | 18–20px |
 | Hero-level panels (dark CTA box) | 26px |
 
-Rule: interactive = pill (on landing) or 11px (in app); containers = 18–26px growing with size. Don't mix outside this table.
+Rule: interactive = pill everywhere; inputs 11px; containers = 18–26px growing with size. Don't mix outside this table.
 
 ## 5. Elevation & shadow
 
@@ -89,17 +88,21 @@ Rule: interactive = pill (on landing) or 11px (in app); containers = 18–26px g
 
 ## 6. Buttons
 
-### App base (`styles.css`)
-- `.btn-primary` — flat `--accent` fill, white text.
-- `.btn-ghost` — white fill, `--input-border` border.
-
-### Landing overrides (`landing.css`, scoped `.vn-landing`)
-- All pills. `.btn-lg`: 54px tall, 0 30px padding, 15px text.
-- **Primary**: depth gradient `#228566 → #1a6a4f`, 1px inner top highlight, green-tinted shadow. Hover: brighter + deeper shadow + 1px lift + arrow slides 3px.
-- **Ghost**: transparent, hairline border, `--ink` text. Hover: firmer border + translucent white fill.
-- **`.btn-on-dark`**: warm off-white gradient `#fdfcfa → #efede7`, inner highlight, deep shadow. For the dark panel only.
+### Base (`styles.css`, app-wide)
+- All buttons are **full pills**.
+- `.btn-primary` — depth gradient `#228566 → #1a6a4f`, 1px inner top highlight, green-tinted shadow (`rgba(18,52,40,.5)`). Hover: brighter gradient + deeper shadow.
+- `.btn-ghost` — transparent, `--input-border` hairline border, `--ink` text.
 - `:focus-visible`: 2px `--accent` outline, 2px offset. Always.
-- `:active`: press back down (translate 0). Tactile.
+- `:active`: 1px press-down. Tactile.
+- Disabled: `opacity .6`, `cursor: not-allowed`, no transform.
+
+### Landing additions (`landing.css`, scoped `.vn-landing`)
+- `.btn-lg`: 54px tall, 0 30px padding, 15px text; hover 1px lift + arrow slides 3px.
+- Ghost hover: firmer border + translucent white fill.
+- **`.btn-on-dark`**: warm off-white gradient `#fdfcfa → #efede7`, inner highlight, deep shadow. For the dark panel only.
+
+### Muted-primary state (forms)
+When a primary CTA is present but not yet actionable (e.g. "Mark as Ready" with an incomplete form), do not fade the green button (contrast failure). Use the muted variant: `--card` fill, `--label` text, `--input-border` border, no shadow (see `.vn-form-cta-muted`).
 
 ### CTA copy rules
 - **One label per intent.** App entry = "Open the app" everywhere (nav, hero, dark panel). Never introduce synonyms ("Start your journey", "Get started").

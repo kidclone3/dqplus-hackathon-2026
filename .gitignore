@@ -28,4 +28,11 @@ pids/
 .claude/memory/
 .claude/plans/
 .claude/session-logs/
+.claude/worktrees/
 Claude-Sessions/
+
+# Editor swap files
+*.swp
+
+# Redaction-tool mapping store (contains real values)
+data/mappings.json

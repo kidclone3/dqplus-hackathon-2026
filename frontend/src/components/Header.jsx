@@ -26,7 +26,8 @@ export default function Header({ session, status, onLogout }) {
           </a>
         )}
         <span className={'vn-header-status ' + (ready ? 'ready' : 'draft')}>
-          {ready ? '● Ready' : '○ Draft'}
+          <i className="dot" aria-hidden="true" />
+          {ready ? 'Ready' : 'Draft'}
         </span>
         <span className="vn-header-email">{session.user.username}</span>
         <button type="button" className="btn btn-ghost vn-header-logout" onClick={onLogout}>

@@ -4,6 +4,8 @@
 # Host port 5433 by default — the old deal-flow-matchmaker-postgres-1 container
 # still holds 5432 on this machine.
 services:
+  # Backend DB — user info only (users / profiles / extracted_profiles), used by
+  # gateway + extract. Host port 5433. (gateway/extract self-create their tables.)
   postgres:
     image: pgvector/pgvector:pg16
     container_name: dqplus-postgres
@@ -16,8 +18,27 @@ services:
       - "${DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # ai-data-platform tables for the matching API — applied only on a fresh volume
-      - ./ai-data-platform/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dealflow} -d ${DB_NAME:-dealflow}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Platform DB — ai-data-platform data (entities / edges / matches / sagas / jobs …),
+  # used by ai-data-platform only. Host port 5432. Separate from the backend user DB;
+  # the platform reads user profiles from the extract service over HTTP, not by SQL.
+  platform-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: dqplus-platform-postgres
+    user: postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-dealflow}
+      POSTGRES_USER: ${DB_USER:-dealflow}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dealflow}
+    ports:
+      - "${PLATFORM_DB_PORT:-5432}:5432"
+    volumes:
+      - platform_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dealflow} -d ${DB_NAME:-dealflow}"]
       interval: 5s
@@ -51,7 +72,11 @@ services:
       timeout: 5s
       retries: 5
 
+  # DISABLED — retired in favour of the ai-data-platform, which now serves /matches
+  # (RAG/GraphRAG) directly. The `disabled` profile excludes it from the default
+  # `docker compose up`; start it only with `--profile disabled` if ever needed.
   matching-engine:
+    profiles: ["disabled"]
     build: ./backend/matching-engine
     container_name: dqplus-matching-engine
     environment:
@@ -117,14 +142,17 @@ services:
     env_file:
       - ./ai-data-platform/.env
     environment:
-      DATABASE_URL: postgres://${DB_USER:-dealflow}:${DB_PASSWORD:-dealflow}@postgres:5432/${DB_NAME:-dealflow}
+      DATABASE_URL: postgres://${DB_USER:-dealflow}:${DB_PASSWORD:-dealflow}@platform-postgres:5432/${DB_NAME:-dealflow}
+      # User profiles live in the backend DB now; the platform fetches them over HTTP
+      # from the extract service (GET /extracted/:userId) for the /matches endpoints.
+      EXTRACT_SERVICE_URL: http://extract:3003
       # Same secret as the gateway: the dashboard (GET /) is admin-only and
       # verifies gateway-issued JWTs (role=admin, DB-provisioned).
       JWT_SECRET: ${JWT_SECRET:-change-me-in-a-real-environment}
     ports:
       - "${MATCHING_API_PORT:-8000}:8000"
     depends_on:
-      postgres:
+      platform-postgres:
         condition: service_healthy
 
   # web is internal-only and scalable (no container_name / no published port) so
@@ -136,7 +164,7 @@ services:
       - "80"
     depends_on:
       - gateway
-      - matching-engine
+      - ai-data-platform
       - extract
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
@@ -157,3 +185,4 @@ services:
 
 volumes:
   pgdata:
+  platform_pgdata:

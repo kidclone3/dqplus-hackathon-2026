@@ -14,6 +14,7 @@ cited sources rather than guessed.
 - [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — **start here** — plain-language overview of the problem, solution, and users (non-technical).
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — services, request flow, data model, deployment.
 - [`docs/TECHNOLOGY.md`](docs/TECHNOLOGY.md) — the stack, the design decisions, and config.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — where the product goes next (system-wide, with per-component roadmaps under `docs/roadmap/`).
 - [`ai-data-platform/docs/`](ai-data-platform/docs/) — the research-grade Python agent platform.
 
 ## Repo layout

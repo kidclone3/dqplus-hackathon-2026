@@ -1,10 +1,23 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import Header from './components/Header.jsx';
 import Landing from './views/Landing.jsx';
-import AuthGate from './views/AuthGate.jsx';
-import ProfileForm from './views/ProfileForm.jsx';
-import Matches from './views/Matches.jsx';
-import MatchDetail from './views/MatchDetail.jsx';
+
+// Views behind the landing are lazy: smaller first paint, chunks load on demand.
+const AuthGate = lazy(() => import('./views/AuthGate.jsx'));
+const ProfileForm = lazy(() => import('./views/ProfileForm.jsx'));
+const Matches = lazy(() => import('./views/Matches.jsx'));
+const MatchDetail = lazy(() => import('./views/MatchDetail.jsx'));
+
+// Quiet page-header ghost shown while a lazy view chunk loads (no spinner).
+function ViewFallback() {
+  return (
+    <div className="vn-view-loading" aria-busy="true" aria-label="Loading">
+      <span className="vn-skel vn-skel-eyebrow" />
+      <span className="vn-skel vn-skel-title" />
+      <span className="vn-skel vn-skel-lede" />
+    </div>
+  );
+}
 import { INTENTS } from './data/ecosystem.js';
 import { genDraft } from './lib/draft.js';
 import {
@@ -71,10 +84,19 @@ export default function App() {
   const [view, setView] = useState('form');
   const [intent, setIntent] = useState('investors');
   const [topK, setTopK] = useState(5);
+  // Client-side match filters over the loaded candidate list ('all' = off).
+  const [matchFilter, setMatchFilter] = useState({ type: 'all', sector: 'all' });
   const [matchData, setMatchData] = useState(idleMatches);
   const [selCandidate, setSelCandidate] = useState(null);
   const [emailLang, setEmailLang] = useState('vi');
   const [copied, setCopied] = useState(false);
+
+  // True while the saved profile is being fetched on first load; the form shows
+  // a skeleton instead of empty fields that pop in.
+  const [hydrating, setHydrating] = useState(() => {
+    const s = loadSession();
+    return !!(s && s.user.profileId);
+  });
 
   const hydrated = useRef(false);
 
@@ -105,7 +127,8 @@ export default function App() {
             setSession(null);
             persistSession(null);
           }
-        });
+        })
+        .finally(() => setHydrating(false));
     } else if (mirror) {
       setForm({ ...emptyForm, ...mirror.form });
       setStatus(mirror.status || 'draft');
@@ -156,6 +179,7 @@ export default function App() {
     persistSession(newSession);
     setMatchData(idleMatches);
     if (newSession.user.profileId) {
+      setHydrating(true);
       getProfile(newSession.token, newSession.user.profileId)
         .then((p) => {
           setForm({ ...fromProfile(p), consent: false });
@@ -166,7 +190,8 @@ export default function App() {
             setSession(null);
             persistSession(null);
           }
-        });
+        })
+        .finally(() => setHydrating(false));
     }
   }
 
@@ -284,11 +309,22 @@ export default function App() {
 
   if (!session) {
     if (!entered) return <Landing onEnter={() => setEntered(true)} />;
-    return <AuthGate onAuthed={handleAuthed} />;
+    return (
+      <Suspense fallback={<ViewFallback />}>
+        <AuthGate onAuthed={handleAuthed} />
+      </Suspense>
+    );
   }
 
   const sorted = matchData.candidates;
-  const shown = topK >= sorted.length ? sorted : sorted.slice(0, topK);
+  const typeOptions = [...new Set(sorted.map((c) => c.entityType))];
+  const sectorOptions = [...new Set(sorted.flatMap((c) => c.sectors))].sort();
+  const filtered = sorted.filter(
+    (c) =>
+      (matchFilter.type === 'all' || c.entityType === matchFilter.type) &&
+      (matchFilter.sector === 'all' || c.sectors.includes(matchFilter.sector))
+  );
+  const shown = topK >= filtered.length ? filtered : filtered.slice(0, topK);
   const items = shown.map((c, i) => ({ candidate: c, rank: i + 1 }));
 
   const profileName = form.name || (role === 'investor' ? 'your fund' : 'your startup');
@@ -304,6 +340,7 @@ export default function App() {
   function onIntentChange(id) {
     setIntent(id);
     setTopK(5);
+    setMatchFilter({ type: 'all', sector: 'all' });
     setSelCandidate(null);
     setCopied(false);
   }
@@ -332,15 +369,17 @@ export default function App() {
     setCopied(false);
   }
 
-  const cand = selCandidate || sorted[0];
-  const candRank = cand ? sorted.indexOf(cand) + 1 : 0;
+  const cand = selCandidate || filtered[0];
+  const candRank = cand ? filtered.indexOf(cand) + 1 : 0;
 
   return (
     <div className="vn-shell">
       <Header session={session} status={status} onLogout={logout} />
+      <Suspense fallback={<ViewFallback />}>
       {view === 'form' && (
         <ProfileForm
           role={role}
+          hydrating={hydrating}
           form={form}
           onField={setField}
           onToggleSector={toggleSector}
@@ -367,8 +406,12 @@ export default function App() {
           onIntent={onIntentChange}
           topK={topK}
           onTopK={setTopK}
+          filter={matchFilter}
+          onFilter={setMatchFilter}
+          typeOptions={typeOptions}
+          sectorOptions={sectorOptions}
           items={items}
-          total={sorted.length}
+          total={filtered.length}
           title={title}
           sub={sub}
           onOpen={openMatch}
@@ -388,6 +431,7 @@ export default function App() {
           onBack={() => setView('matches')}
         />
       )}
+      </Suspense>
     </div>
   );
 }

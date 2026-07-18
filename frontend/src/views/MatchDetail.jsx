@@ -78,25 +78,21 @@ export default function MatchDetail({ candidate, rank, intent, emailLang, onLang
       </section>
 
       {candidate.reasons.length > 0 && (
-        <section className="card rise vn-detail-section">
+        <section className="vn-detail-flat rise vn-detail-section">
           <div className="card-label vn-detail-facts-label">Match signals</div>
           <div className="vn-detail-facts">
             {candidate.reasons.map((r) => (
-              <div className="vn-detail-fact" key={r}>
-                <i className="vn-detail-fact-dot"></i>{r}
-              </div>
+              <div className="vn-detail-fact" key={r}>{r}</div>
             ))}
           </div>
         </section>
       )}
 
-      <section className="card rise vn-detail-section">
+      <section className="vn-detail-flat rise vn-detail-section">
         <div className="card-label vn-detail-facts-label">Key facts</div>
         <div className="vn-detail-facts">
           {facts.map((f) => (
-            <div className="vn-detail-fact" key={f}>
-              <i className="vn-detail-fact-dot"></i>{f}
-            </div>
+            <div className="vn-detail-fact" key={f}>{f}</div>
           ))}
         </div>
       </section>
@@ -115,7 +111,7 @@ export default function MatchDetail({ candidate, rank, intent, emailLang, onLang
           <>
             <div className="vn-detail-draft-box">{draftText}</div>
             <div className="vn-detail-copy-row">
-              <button type="button" className="btn-ghost vn-detail-copy-btn" onClick={onCopy}>{copied ? '✓ Copied' : 'Copy draft'}</button>
+              <button type="button" className="btn btn-ghost vn-detail-copy-btn" onClick={onCopy}>{copied ? 'Copied' : 'Copy draft'}</button>
             </div>
           </>
         )}
