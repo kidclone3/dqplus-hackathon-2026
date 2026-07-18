@@ -1,7 +1,12 @@
 node_modules/
 .env
 logs/
+pids/
+
+# Deploy secrets/tooling — local only, never commit
 *.pem
+deploy/hackathonai.pem
+deploy/port-forward.sh
 
 # Python
 __pycache__/
