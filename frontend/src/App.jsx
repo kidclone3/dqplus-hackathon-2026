@@ -84,8 +84,8 @@ export default function App() {
   const [view, setView] = useState('form');
   const [intent, setIntent] = useState('investors');
   const [topK, setTopK] = useState(5);
-  // Client-side match filters over the loaded candidate list ('all' = off).
-  const [matchFilter, setMatchFilter] = useState({ type: 'all', sector: 'all' });
+  // Client-side match filters over the loaded candidate list ('all' / [] = off).
+  const [matchFilter, setMatchFilter] = useState({ type: 'all', sectors: [] });
   const [matchData, setMatchData] = useState(idleMatches);
   const [selCandidate, setSelCandidate] = useState(null);
   const [emailLang, setEmailLang] = useState('vi');
@@ -322,7 +322,7 @@ export default function App() {
   const filtered = sorted.filter(
     (c) =>
       (matchFilter.type === 'all' || c.entityType === matchFilter.type) &&
-      (matchFilter.sector === 'all' || c.sectors.includes(matchFilter.sector))
+      (matchFilter.sectors.length === 0 || c.sectors.some((s) => matchFilter.sectors.includes(s)))
   );
   const shown = topK >= filtered.length ? filtered : filtered.slice(0, topK);
   const items = shown.map((c, i) => ({ candidate: c, rank: i + 1 }));
@@ -340,7 +340,7 @@ export default function App() {
   function onIntentChange(id) {
     setIntent(id);
     setTopK(5);
-    setMatchFilter({ type: 'all', sector: 'all' });
+    setMatchFilter({ type: 'all', sectors: [] });
     setSelCandidate(null);
     setCopied(false);
   }

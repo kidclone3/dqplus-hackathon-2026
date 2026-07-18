@@ -1,16 +1,69 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { INTENTS } from '../data/ecosystem.js';
 import { prefersReduced } from '../lib/anim.js';
+import { entityMeta } from '../lib/api.js';
 import './matches.css';
 
 const SKELETON_ROWS = [0, 1, 2];
 
-const typeLabel = (t) => {
-  const s = t.replace(/_/g, ' ');
-  return s.charAt(0).toUpperCase() + s.slice(1);
-};
+// Multi-select checkbox popover (shadcn-style pattern, styled with our tokens).
+function SectorSelect({ options, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const toggle = (s) =>
+    onChange(selected.includes(s) ? selected.filter((x) => x !== s) : [...selected, s]);
+  const label =
+    selected.length === 0 ? 'All sectors' : selected.length === 1 ? selected[0] : selected.length + ' sectors';
+
+  return (
+    <div className="vn-sector-select" ref={wrapRef}>
+      <button
+        type="button"
+        className={'vn-match-filter-chip vn-sector-trigger' + (selected.length ? ' active' : '')}
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        {label}
+        <span className="vn-sector-caret" aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <div className="vn-sector-menu">
+          {options.map((s) => (
+            <label className="vn-sector-item" key={s}>
+              <input type="checkbox" checked={selected.includes(s)} onChange={() => toggle(s)} />
+              <span>{s}</span>
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <button type="button" className="vn-sector-clear" onClick={() => onChange([])}>
+              Clear selection
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Matches({ role, profileName, intent, live, matchStatus, matchError, onRetry, onIntent, topK, onTopK, filter, onFilter, typeOptions, sectorOptions, items, total, title, sub, onOpen, onBackToForm }) {
   const rootRef = useRef(null);
@@ -23,8 +76,8 @@ export default function Matches({ role, profileName, intent, live, matchStatus, 
   }, { scope: rootRef, dependencies: [intent, topK, matchStatus, filter] });
 
   const ready = live && matchStatus === 'ready';
-  const filtering = filter.type !== 'all' || filter.sector !== 'all';
-  const clearFilters = () => onFilter({ type: 'all', sector: 'all' });
+  const filtering = filter.type !== 'all' || filter.sectors.length > 0;
+  const clearFilters = () => onFilter({ type: 'all', sectors: [] });
 
   const openCard = (candidate, rank) => onOpen({ candidate, rank });
 
@@ -60,7 +113,8 @@ export default function Matches({ role, profileName, intent, live, matchStatus, 
                   className={'vn-match-filter-chip' + (filter.type === t ? ' active' : '')}
                   onClick={() => onFilter({ ...filter, type: t })}
                 >
-                  {t === 'all' ? 'All' : typeLabel(t)}
+                  {t !== 'all' && <span className="dot" style={{ background: entityMeta(t).dot }}></span>}
+                  {t === 'all' ? 'All' : entityMeta(t).label}
                 </button>
               ))}
             </div>
@@ -68,16 +122,11 @@ export default function Matches({ role, profileName, intent, live, matchStatus, 
           {sectorOptions.length > 1 && (
             <div className="vn-match-filter-group">
               <span className="vn-match-filter-label">Sector</span>
-              {['all', ...sectorOptions].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className={'vn-match-filter-chip' + (filter.sector === s ? ' active' : '')}
-                  onClick={() => onFilter({ ...filter, sector: s })}
-                >
-                  {s === 'all' ? 'All' : s}
-                </button>
-              ))}
+              <SectorSelect
+                options={sectorOptions}
+                selected={filter.sectors}
+                onChange={(sectors) => onFilter({ ...filter, sectors })}
+              />
             </div>
           )}
         </div>

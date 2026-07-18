@@ -97,15 +97,20 @@ export function getAllMatches({ startupId } = {}) {
 }
 
 // Entity types returned by the matching API (ai-data-platform /matches/...).
+// Dot hues stay desaturated per the design system — one distinct hue per type.
 const ENTITY_TYPES = {
   startup: { label: 'Startup', dot: '#3f8f6b' },
   investor: { label: 'Investor', dot: '#b08636' },
-  corporation: { label: 'Corporation', dot: '#b08636' },
+  corporation: { label: 'Corporation', dot: '#a2603f' },
   university: { label: 'University', dot: '#5b7a9d' },
-  research_institution: { label: 'Research institute', dot: '#5b7a9d' },
+  research_institution: { label: 'Research institute', dot: '#7f6890' },
 };
 
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+export function entityMeta(type) {
+  return ENTITY_TYPES[type] || { label: cap(type) || 'Partner', dot: '#b08636' };
+}
 const sectorLabel = (s) => {
   const t = String(s).replace(/_/g, ' ');
   return t.length <= 2 ? t.toUpperCase() : cap(t);
@@ -117,7 +122,7 @@ const sectorLabel = (s) => {
 export function matchToCandidate(m) {
   const norm = (m.profile && m.profile.normalized) || {};
   const reasons = m.reasons || [];
-  const entity = ENTITY_TYPES[m.type] || { label: cap(m.type) || 'Partner', dot: '#b08636' };
+  const entity = entityMeta(m.type);
   return {
     userId: m.id,
     entityType: m.type,
