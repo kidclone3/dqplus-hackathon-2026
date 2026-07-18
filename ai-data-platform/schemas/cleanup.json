@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cleanup audit verdicts (R3 contract for the janitor agent)",
+  "type": "object",
+  "required": ["verdicts"],
+  "properties": {
+    "verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "action", "reason"],
+        "properties": {
+          "id": {"type": "string"},
+          "action": {"type": "string", "enum": ["delete", "keep"]},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "summary": {"type": "string"}
+  }
+}

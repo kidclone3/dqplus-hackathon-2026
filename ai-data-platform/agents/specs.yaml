@@ -46,3 +46,14 @@ agents:
     skill: .feynman/agent/skills/draft-verify
     tools: [read]
     pool_size: 1
+
+  # Cleanup saga (audit -> purge). pi = reasoning runtime, no web tools. The
+  # janitor only VERDICTS (delete/keep per candidate); the purge code stage does
+  # the actual deletion behind a prefix rail — the agent can spare entities,
+  # never widen the blast radius.
+  janitor:
+    runtime: pi
+    stage: audit
+    skill: .feynman/agent/skills/entity-cleanup
+    tools: [read]
+    pool_size: 1

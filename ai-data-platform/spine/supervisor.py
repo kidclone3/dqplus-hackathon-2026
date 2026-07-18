@@ -16,7 +16,7 @@ import os
 import signal
 import uuid
 
-from . import config, outreach, pools, sagas, telemetry
+from . import cleanup, config, outreach, pools, sagas, telemetry
 from .matcher.llm_judge import LlmJudgeMatcher
 from .store import Store
 from .transport import LocalProcessLauncher, ProcessDied, RpcResult
@@ -27,7 +27,7 @@ log = telemetry.get_logger("supervisor")
 class Supervisor:
     def __init__(self, store: Store, *, boot_epoch: str | None = None,
                  reclaim_interval: float = 3.0, launcher: LocalProcessLauncher | None = None,
-                 specs_path: str = pools.DEFAULT_PATH):
+                 specs_path: str = pools.DEFAULT_PATH, stages: list[str] | None = None):
         self.store = store
         self.boot_epoch = boot_epoch or uuid.uuid4().hex
         self.reclaim_interval = reclaim_interval
@@ -40,9 +40,13 @@ class Supervisor:
         self.launcher = launcher
         self.specs = pools.load_specs(specs_path)
         self.by_stage = pools.specs_by_stage(self.specs)
-        # Both sagas drain in one supervisor run: onboarding + outreach stages.
-        self._all_stages = sagas.ONBOARDING_STAGES + outreach.OUTREACH_STAGES
-        self._agent_stages = sagas.AGENT_STAGES | outreach.OUTREACH_AGENT_STAGES
+        # All sagas drain in one supervisor run: onboarding + outreach + cleanup.
+        # `stages` restricts the run (e.g. scripts/cleanup.py drains only cleanup
+        # without leasing stale jobs from the other sagas).
+        self._all_stages = stages or (sagas.ONBOARDING_STAGES + outreach.OUTREACH_STAGES
+                                      + cleanup.CLEANUP_STAGES)
+        self._agent_stages = (sagas.AGENT_STAGES | outreach.OUTREACH_AGENT_STAGES
+                              | cleanup.CLEANUP_AGENT_STAGES)
         self._sem = asyncio.Semaphore(config.MAX_CONCURRENCY)
         self._stop = asyncio.Event()
 
@@ -125,6 +129,12 @@ class Supervisor:
                 await self._draft_stage(job)
             elif stage == "verify":                      # pi, per match
                 await self._verify_stage(job)
+            elif stage == "audit":                       # pi (cleanup janitor)
+                await self._audit_stage(job)
+            elif stage == "purge":                       # code (cleanup)
+                log.info("purge_stage", prefix=job["target_id"])
+                await cleanup.purge(self.store, job)
+                log.info("cleanup_done", prefix=job["target_id"])
             else:
                 log.warning("unknown_stage", stage=stage)
                 await self.store.fail_job(job_id)
@@ -184,6 +194,19 @@ class Supervisor:
             log.info("job_failed", new_status=status)
             return
         await sagas.persist_and_advance(self.store, job, result.data)
+
+    async def _audit_stage(self, job) -> None:
+        """cleanup audit (pi janitor): prompt → validate verdicts (R3) → advance to purge."""
+        spec = self.by_stage["audit"]
+        prompt = await cleanup.build_prompt(job, self.store)
+        result = await self._run_worker(spec, prompt, job)
+        if not result.success or not cleanup.validate(result.data):
+            log.warning("audit_reject", stop_reason=result.stop_reason,
+                        error=result.error_message, has_data=result.data is not None)
+            status = await self.store.fail_job(job["id"])
+            log.info("job_failed", new_status=status)
+            return
+        await cleanup.persist_and_advance(self.store, job, result.data)
 
     async def _startup_id(self, job) -> str:
         saga = await self.store.get_saga(job["saga_id"])

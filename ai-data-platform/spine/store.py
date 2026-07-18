@@ -93,6 +93,25 @@ class Store:
             json.dumps(payload) if payload is not None else None,
         )
 
+    async def delete_entities(self, entity_ids: list[str]) -> dict[str, int]:
+        """Cleanup purge: remove graph data for the given ids in one transaction —
+        matches/matches_v2 (FK + shadow), edges touching them, then the entities.
+        Operational history (sagas/jobs/events/artifacts/llm_usage) is untouched."""
+        counts: dict[str, int] = {}
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                for table, cond in (
+                    ("matches", "startup_id = ANY($1) OR partner_id = ANY($1)"),
+                    ("matches_v2", "startup_id = ANY($1) OR partner_id = ANY($1)"),
+                    ("edges", "src_id = ANY($1) OR dst_id = ANY($1)"),
+                    ("entities", "id = ANY($1)"),
+                ):
+                    tag = await conn.execute(
+                        f"DELETE FROM {table} WHERE {cond}", entity_ids
+                    )
+                    counts[table] = int(tag.rsplit(" ", 1)[-1])
+        return counts
+
     # ---------- artifacts / events ----------
 
     async def record_artifact(self, saga_id: str, step: str, payload: dict, *,
