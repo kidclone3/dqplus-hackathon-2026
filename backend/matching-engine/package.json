@@ -1,0 +1,18 @@
+{
+  "name": "matching-engine",
+  "version": "1.0.0",
+  "description": "Matches founders and investors via pgvector similarity + attribute scoring",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  }
+}
