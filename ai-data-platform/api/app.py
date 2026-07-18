@@ -27,10 +27,10 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
-from spine import outreach, telemetry
-from spine.graph import build_graph, path_to_dict
-from spine.matcher import embedding_matcher
-from spine.store import Store
+from apps.matchmaker.graph import build_graph, path_to_dict
+from apps.matchmaker.matcher import embedding_matcher
+from apps.matchmaker.store import MatchmakerStore as Store
+from spine import telemetry
 
 log = telemetry.get_logger("api")
 _DASHBOARD = Path(__file__).resolve().parent.parent / "dashboard" / "index.html"
@@ -310,7 +310,7 @@ async def discover_investors(startup_id: str = Query(...), query: str = Query(""
     except (json.JSONDecodeError, AttributeError):
         pass
 
-    from spine.matcher.semantic import calculate_fit_score
+    from apps.matchmaker.matcher.semantic import calculate_fit_score
 
     results = []
     for row in candidates:
@@ -680,7 +680,10 @@ async def create_run(body: dict | None = None):
 
     sagas_started = []
     for sid in ids:
-        saga_id = await outreach.start(store, sid, trace_id=trace_id)
+        saga_id = f"outreach:{sid}"
+        await store.create_saga(saga_id, "outreach", sid,
+                                current_step="filter", trace_id=trace_id)
+        await store.enqueue_job(saga_id, "filter", target_id=sid, trace_id=trace_id)
         sagas_started.append(saga_id)
     log.info("run_triggered", trace_id=trace_id, count=len(sagas_started))
     return JSONResponse(

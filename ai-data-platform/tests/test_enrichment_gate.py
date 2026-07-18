@@ -6,7 +6,7 @@ skips them. Regression guard for the Touchstone Partners case: a nonexistent see
 (NXDOMAIN domain, no corroborating source) that was persisted as 'ready' and entered
 matching with an all-null profile.
 """
-from spine.sagas import _count_populated, _enrichment_failed
+from apps.matchmaker.plugin import _count_populated, _enrichment_failed
 
 
 def _field(value):

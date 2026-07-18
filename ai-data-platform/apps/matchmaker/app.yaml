@@ -1,0 +1,63 @@
+# Matchmaker — app #1 on the spindle platform (spec §C, §F).
+#
+# Mirrors today's two hardcoded sagas as declarative data:
+#   onboarding: enrich -> extract -> link      (spine/sagas.py ONBOARDING_STAGES)
+#   outreach:   filter -> match -> draft -> verify   (spine/outreach.py OUTREACH_STAGES)
+#
+# There is NO 'ingest' stage today — onboarding starts at enrich.
+# Agents mirror agents/specs.yaml (pool key = runtime, skill, model).
+app_id: matchmaker
+plugin: apps.matchmaker.plugin          # dotted path the platform imports at boot
+
+agents:
+  enricher:
+    runtime: feynman
+    skill: .feynman/agent/skills/entity-enrichment
+    tools: [web_search, fetch_content, get_search_content, document_parse, read, write]
+    pool_size: 2
+  extractor:
+    runtime: feynman
+    skill: .feynman/agent/skills/profile-extraction
+    tools: [fetch_content, document_parse, read, write]
+    pool_size: 2
+  matcher:
+    runtime: pi
+    skill: .feynman/agent/skills/dealflow-match
+    tools: [read]
+    pool_size: 1
+  drafter:
+    runtime: pi
+    skill: .feynman/agent/skills/dealflow-match
+    tools: [read]
+    pool_size: 1
+  verifier:
+    runtime: pi
+    skill: .feynman/agent/skills/draft-verify
+    tools: [read]
+    pool_size: 1
+  # Cleanup saga (audit -> purge). pi = reasoning runtime, no web tools. The
+  # janitor only VERDICTS (delete/keep per candidate); the purge code stage does
+  # the actual deletion behind a prefix rail — the agent can spare entities,
+  # never widen the blast radius.
+  janitor:
+    runtime: pi
+    skill: .feynman/agent/skills/entity-cleanup
+    tools: [read]
+    pool_size: 1
+
+ports:                                  # named, app-swappable (the Matcher generalizes to this)
+  matcher: matchmaker.LlmJudgeMatcher   # one-line swap -> EmbeddingMatcher / GraphRagMatcher later
+
+sagas:
+  onboarding:                           # subject: entity
+    - { stage: enrich,  run: enricher }
+    - { stage: extract, run: extractor }
+    - { stage: link,    run: code }
+  outreach:                             # subject: startup
+    - { stage: filter,  run: code }
+    - { stage: match,   run: matcher, port: matcher }
+    - { stage: draft,   run: drafter }
+    - { stage: verify,  run: verifier, on_reject: { retry: draft, max: 3, then: dead } }  # = config.MAX_ATTEMPTS (spec §C showed 2 illustratively)
+  cleanup:                              # subject: entity-id prefix (graph hygiene)
+    - { stage: audit,   run: janitor }
+    - { stage: purge,   run: code }

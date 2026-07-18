@@ -30,7 +30,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
-from .ids import slugify
+from spine.ids import slugify
 
 # Edge kinds worth traversing for co-investment / partnership discovery.
 # Includes capital-flavored and partnership-flavored relationships that connect

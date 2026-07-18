@@ -21,9 +21,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # run directly
 
 from spine import config, pools
-from spine.matcher import rule_filter
-from spine.matcher.llm_judge import LlmJudgeMatcher
-from spine.store import Store
+from apps.matchmaker.matcher import rule_filter
+from apps.matchmaker.matcher.llm_judge import LlmJudgeMatcher
+from apps.matchmaker.store import MatchmakerStore as Store
 from spine.transport import LocalProcessLauncher
 
 MODEL = os.environ.get("DRYRUN_MODEL", "fptcloud/DeepSeek-V4-Flash")

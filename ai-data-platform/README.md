@@ -29,6 +29,7 @@ enrichment, extraction, match explanation, drafting, verification — runs insid
 - [`docs/AGENT_FLOWS.md`](docs/AGENT_FLOWS.md) — the runtimes, the spine↔agent JSON contract, and both sagas end to end
 - [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) — dashboard visual language (tokens, components, conventions)
 - [`docs/superpowers/specs/2026-07-18-agent-data-platform-design.md`](docs/superpowers/specs/2026-07-18-agent-data-platform-design.md) — full design of record
+- [`docs/superpowers/specs/2026-07-19-self-improvement-loop-design.md`](docs/superpowers/specs/2026-07-19-self-improvement-loop-design.md) — **self-improvement loop** — the gated, un-gameable self-evolution layer (P1/P2 proven offline)
 
 ## Prerequisites
 
@@ -169,3 +170,9 @@ uv run pytest -q
 
 Crash-recovery, idempotency, dead-letter, and session-hygiene coverage lives in
 `tests/test_crash_recovery.py` and `tests/test_idempotency.py`.
+
+### Offline North Star gate
+
+`bash scripts/north_star.sh` runs the full A1–A5 cold-boot flow **offline** (fake agent
+runtime, ephemeral DB, ~0 cost, <5s). This is the regression gate for the platform
+generalization: every extraction phase must keep it green.

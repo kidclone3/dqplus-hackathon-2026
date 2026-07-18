@@ -22,8 +22,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from spine import embedding, telemetry
-from spine.store import Store
+from apps.matchmaker import embedding
+from spine import telemetry
+from apps.matchmaker.store import MatchmakerStore as Store
 
 log = telemetry.get_logger("embed_entities")
 

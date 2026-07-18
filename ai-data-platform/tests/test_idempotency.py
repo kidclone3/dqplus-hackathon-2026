@@ -68,7 +68,8 @@ async def test_bootstrap_seed_is_idempotent(store):
 
 
 async def test_link_stage_is_idempotent(store, saga_id):
-    from spine import sagas
+    from apps.matchmaker.plugin import link
+    from spindle.app.context import StageCtx
 
     eid = "startup:linkidem-" + _uid()
     await store.upsert_entity(eid, "startup", "Link Idem Co",
@@ -85,9 +86,10 @@ async def test_link_stage_is_idempotent(store, saga_id):
         saga_id, "extract",
         {"sectors": ["agritech"], "looking_for": ["funding"]}, target_id=eid)
 
-    job = {"id": -1, "saga_id": saga_id, "target_id": eid, "trace_id": "t", "stage": "link"}
-    await sagas.link(store, job)
-    await sagas.link(store, job)   # re-run (e.g. after a reclaim)
+    ctx = StageCtx(app_id="matchmaker", saga_id=saga_id, subject_id=eid, target_id=eid,
+                   trace_id="t", attempts=0, retry_feedback=None, store=store)
+    await link(ctx)
+    await link(ctx)   # re-run (e.g. after a reclaim)
 
     ent = await store.get_entity(eid)
     assert ent["status"] == "ready"

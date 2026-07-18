@@ -5,8 +5,8 @@ dropped, results sorted by composite desc, composite clamped 0-100.
 """
 import pytest
 
-from spine.matcher import ScoredMatch
-from spine.matcher.llm_judge import LlmJudgeMatcher
+from apps.matchmaker.matcher import ScoredMatch
+from apps.matchmaker.matcher.llm_judge import LlmJudgeMatcher
 from spine.transport import RpcResult
 
 

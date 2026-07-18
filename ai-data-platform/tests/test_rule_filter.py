@@ -4,7 +4,7 @@ Asserts the permissive contract: sector overlap is the only hard drop (and only 
 both sides carry sectors); purpose never hard-drops; bilingual tags intersect; the
 filter never collapses to zero when candidates plausibly overlap.
 """
-from spine.matcher import normalize_sectors, rule_filter
+from apps.matchmaker.matcher import normalize_sectors, rule_filter
 
 
 def _partner(pid, type_, *, sectors=None, innovation_areas=None, research_domains=None):

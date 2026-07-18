@@ -4,8 +4,8 @@ import asyncpg
 import pytest
 import pytest_asyncio
 
+from apps.matchmaker.store import MatchmakerStore as Store
 from spine import config
-from spine.store import Store
 
 
 async def _db_reachable() -> bool:

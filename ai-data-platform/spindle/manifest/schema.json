@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spindle.platform/manifest.schema.json",
+  "title": "Spindle app manifest",
+  "description": "Shape of an app's app.yaml (spec §C). Validated by the platform loader before the plugin module is imported. No deal-flow strings live here — the manifest is data an app declares.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["app_id", "plugin", "agents", "sagas"],
+  "properties": {
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "Stable app identifier; scopes every platform-owned row."
+    },
+    "plugin": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_.]*$",
+      "description": "Dotted path the platform imports at boot to register @stage/@agent_stage/@port."
+    },
+    "agents": {
+      "type": "object",
+      "description": "AgentSpec registry. Pool key = (runtime, skill, model).",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/agent" }
+    },
+    "ports": {
+      "type": "object",
+      "description": "Named, app-swappable components exposed to stages via ctx.port(name).",
+      "additionalProperties": { "type": "string" }
+    },
+    "sagas": {
+      "type": "object",
+      "description": "Named sagas; each an ordered list of stages forming a DAG.",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/saga" }
+    }
+  },
+  "$defs": {
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime"],
+      "properties": {
+        "runtime": { "type": "string", "minLength": 1 },
+        "skill": { "type": "string" },
+        "tools": { "type": "array", "items": { "type": "string" } },
+        "pool_size": { "type": "integer", "minimum": 1 },
+        "model": { "type": "string" }
+      }
+    },
+    "saga": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/stage" }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "run"],
+      "properties": {
+        "stage": { "type": "string", "minLength": 1 },
+        "run": {
+          "type": "string",
+          "minLength": 1,
+          "description": "'code' for a plugin @stage function, or an agent name from agents:."
+        },
+        "port": {
+          "type": "string",
+          "description": "Named port from ports: exposed to this stage's ctx."
+        },
+        "on_reject": { "$ref": "#/$defs/on_reject" }
+      }
+    },
+    "on_reject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["retry", "max", "then"],
+      "description": "Declarative retry edge (spec §C/Seam 2).",
+      "properties": {
+        "retry": { "type": "string", "minLength": 1 },
+        "max": { "type": "integer", "minimum": 1 },
+        "then": { "type": "string", "enum": ["dead"] }
+      }
+    }
+  }
+}

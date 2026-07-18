@@ -1,4 +1,4 @@
-"""Cleanup saga: audit (pi agent) -> purge (code).
+"""Cleanup saga helpers: audit (pi agent) -> purge (code).
 
 Prefix-scoped graph hygiene for junk entities (e.g. placeholder rows left by
 aborted onboarding runs, id LIKE 'startup:saga_%'):
@@ -12,21 +12,26 @@ still match the requested prefix — the agent can spare entities, never widen
 the blast radius. Operational history (saga_instances/jobs/events/artifacts/
 llm_usage) is preserved; only graph data (entities, edges, matches, matches_v2)
 is removed.
+
+The stage bodies live in ``apps.matchmaker.plugin`` (``AuditStage`` /
+``purge``); this module holds the evidence query, the prompt, and the R3
+schema gate they share with ``scripts/cleanup.py``.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import jsonschema
 
-from .store import Store
+if TYPE_CHECKING:
+    from apps.matchmaker.store import MatchmakerStore
 
 CLEANUP_STAGES = ["audit", "purge"]
-CLEANUP_AGENT_STAGES = {"audit"}
 
 _SCHEMA = json.loads(
-    (Path(__file__).resolve().parent.parent / "schemas" / "cleanup.json").read_text()
+    (Path(__file__).resolve().parents[2] / "schemas" / "cleanup.json").read_text()
 )
 
 _REMINDER = ("\n\nIMPORTANT: your previous reply was not valid. Respond with ONLY a "
@@ -48,7 +53,7 @@ def validate(data) -> bool:
 
 
 def _count_populated(node) -> int:
-    """Same provenance-field recursion as sagas._count_populated."""
+    """Same provenance-field recursion as the link stage's field counter."""
     if isinstance(node, dict):
         if "value" in node and "confidence" in node:
             v = node.get("value")
@@ -59,7 +64,7 @@ def _count_populated(node) -> int:
     return 0
 
 
-async def candidates(store: Store, prefix: str) -> list[dict]:
+async def candidates(store: "MatchmakerStore", prefix: str) -> list[dict]:
     """Evidence rows for every entity whose id starts with the prefix."""
     rows = await store.pool.fetch(
         """
@@ -99,7 +104,7 @@ async def candidates(store: Store, prefix: str) -> list[dict]:
     return out
 
 
-async def start(store: Store, prefix: str, *, trace_id: str) -> tuple[str, int]:
+async def start(store: "MatchmakerStore", prefix: str, *, trace_id: str) -> tuple[str, int]:
     """Create the cleanup saga for an id prefix and enqueue its audit job."""
     cands = await candidates(store, prefix)
     saga_id = saga_id_for(prefix)
@@ -110,10 +115,7 @@ async def start(store: Store, prefix: str, *, trace_id: str) -> tuple[str, int]:
     return saga_id, len(cands)
 
 
-async def build_prompt(job, store: Store) -> str:
-    prefix = job["target_id"]
-    cands = await candidates(store, prefix)
-    retry = (job["attempts"] or 0) > 1
+def build_prompt(prefix: str, cands: list[dict], *, retry: bool = False) -> str:
     evidence = json.dumps(cands, ensure_ascii=False, indent=1)
     prompt = f"""You are the data janitor for Vietnam's National Innovation Center (NIC) \
 deal-flow database. An operator asked to clean up entities whose id starts with \
@@ -138,39 +140,3 @@ OUTPUT (R3 contract): reply with ONLY a single fenced ```json block:
  "summary": "<one line>"}}
 Include a verdict for EVERY candidate id above, no others. No prose outside the JSON."""
     return prompt + (_REMINDER if retry else "")
-
-
-async def persist_and_advance(store: Store, job, data: dict) -> None:
-    """audit: record the verdict artifact, then advance to the purge code stage."""
-    saga_id, prefix, trace_id = job["saga_id"], job["target_id"], job["trace_id"]
-    await store.record_artifact(saga_id, "audit", data,
-                                target_id=prefix, trace_id=trace_id)
-    deletes = sum(1 for v in data.get("verdicts", []) if v.get("action") == "delete")
-    await store.finish_stage(
-        job_id=job["id"], saga_id=saga_id, event_kind="CleanupAudited",
-        saga_step="purge", saga_status="running",
-        event_payload={"prefix": prefix, "candidates": len(data.get("verdicts", [])),
-                       "delete_verdicts": deletes},
-        trace_id=trace_id,
-        next_stage="purge", next_target_id=prefix,
-        next_input_ref={"from": "audit"},
-    )
-
-
-async def purge(store: Store, job) -> None:
-    """Code stage: delete verdicted-delete ids (prefix rail enforced here)."""
-    saga_id, prefix, trace_id = job["saga_id"], job["target_id"], job["trace_id"]
-    art = await store.get_artifact(saga_id, "audit", prefix) or {}
-    verdicts = art.get("verdicts") or []
-    delete_ids = [v["id"] for v in verdicts
-                  if v.get("action") == "delete"
-                  and isinstance(v.get("id"), str) and v["id"].startswith(prefix)]
-    kept = [v["id"] for v in verdicts if v.get("action") == "keep"]
-    counts = await store.delete_entities(delete_ids) if delete_ids else {}
-    await store.finish_stage(
-        job_id=job["id"], saga_id=saga_id, event_kind="CleanupCompleted",
-        saga_step="purge", saga_status="done",
-        event_payload={"prefix": prefix, "deleted": delete_ids, "kept": kept,
-                       "rows_deleted": counts},
-        trace_id=trace_id,
-    )
