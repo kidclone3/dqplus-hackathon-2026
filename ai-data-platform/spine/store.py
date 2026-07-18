@@ -7,9 +7,16 @@ from typing import Any, Awaitable, Callable
 
 import asyncpg
 
-from . import config
+from . import config, embedding, telemetry
 
 JOBS_CHANNEL = "jobs_ready"
+
+log = telemetry.get_logger("store")
+
+
+def _to_pgvector(vec: list[float]) -> str:
+    """pgvector text literal (bound as $1::vector), e.g. '[0.1,0.2,...]'."""
+    return "[" + ",".join(str(float(x)) for x in vec) + "]"
 
 
 class Store:
@@ -44,6 +51,19 @@ class Store:
             """,
             entity_id, type_, name, json.dumps(profile or {}), status,
         )
+        # Keep entities.embedding current so new/enriched entities are searchable by the
+        # EmbeddingMatcher immediately (in addition to scripts/embed_entities.py). Best-
+        # effort: an embedding failure (endpoint down, etc.) must never fail onboarding.
+        try:
+            vec = await embedding.embed_text(
+                embedding.entity_text({"name": name, "profile": profile or {}})
+            )
+            await self._pool.execute(
+                "UPDATE entities SET embedding = $1::vector WHERE id = $2",
+                _to_pgvector(vec), entity_id,
+            )
+        except Exception as e:  # noqa: BLE001 — onboarding must survive embedding errors
+            log.warning("embed_on_upsert_failed", entity_id=entity_id, error=repr(e))
 
     async def get_entity(self, entity_id: str) -> dict | None:
         row = await self._pool.fetchrow(

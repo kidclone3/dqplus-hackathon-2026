@@ -11,10 +11,9 @@ see [`ARCHITECTURE.md`](ARCHITECTURE.md).
 |-------|-----------|-------|
 | Web frontend | Vite 5, React 18, GSAP (animation) | `frontend/` |
 | Mobile | Expo 54, React Native 0.81, React Navigation 7 | `mobile/` |
-| API services | Node.js, Express 4 | `backend/*` |
-| Auth | JWT (`jsonwebtoken`), `bcrypt` | `backend/gateway` |
-| ORM | Sequelize 6 | `backend/gateway` |
-| DB access (agents) | `pg` + `pgvector` node client | extract, matching |
+| API services | Python 3.12, FastAPI, `uv` | `backend/*` |
+| Auth | JWT (`pyjwt`), `bcrypt` | `backend/gateway` |
+| DB access | `asyncpg` (raw SQL, idempotent DDL bootstrap at startup) | `backend/*` |
 | Database | PostgreSQL 16 + **pgvector** (HNSW) | `docker-compose.yml` |
 | AI (extraction) | OpenAI-compatible chat, JSON-schema output | `backend/agent/extract` |
 | AI (embeddings) | `text-embedding-3-small` (1536-dim) + keyless fallback | `backend/agent/extract` |
@@ -39,10 +38,11 @@ each emit a plain-language reason. Founders and investors see *why* a match rank
 did — trust matters more than a marginally better opaque score. Weights and candidate-pool
 size are env-tunable.
 
-**Node/Express, split by concern.** Three small services (identity, extraction, matching)
+**Python/FastAPI, split by concern.** Three small services (identity, extraction, matching)
 instead of one monolith: each has a single responsibility, its own `.env`, and can be
-deployed/tunneled independently. Express keeps them thin and readable — the interesting
-logic is the SQL and the scoring, not the framework.
+deployed/tunneled independently. FastAPI keeps them thin and readable — the interesting
+logic is the SQL and the scoring, not the framework — and the whole stack (services +
+`ai-data-platform`) now shares one language and toolchain (`uv`).
 
 **FPT Cloud for LLM/embeddings.** An OpenAI-compatible endpoint hosted in-region — relevant
 for a Vietnam-focused product (latency, data locality, and using a local cloud sponsor).
@@ -113,13 +113,13 @@ composite `/matches`).
 ## 5. Running it
 
 ```bash
-# Everything (Postgres + all three Node services), with tailed logs:
+# Everything (Postgres + all three backend services), with tailed logs:
 ./start.sh
 
-# Individually:
-cd backend/gateway         && npm run dev   # :3000
-cd backend/agent/extract   && npm run dev   # :3001 (:3003 here)
-cd backend/matching-engine && npm run dev   # :3002
+# Individually (uv sync on first run):
+cd backend/gateway         && uv run uvicorn app.main:app --port 3000 --reload
+cd backend/agent/extract   && uv run uvicorn app.main:app --port 3001 --reload   # :3003 here
+cd backend/matching-engine && uv run uvicorn app.main:app --port 3002 --reload
 cd frontend                && npm run dev   # :5173
 
 # AI Data Platform (Python):

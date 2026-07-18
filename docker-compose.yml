@@ -39,14 +39,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-a-real-environment}
       JWT_EXPIRES_IN: 1d
       EXTRACT_SERVICE_URL: http://extract:3003
-      MATCHING_API_URL: http://matching-api:8000
+      MATCHING_API_URL: http://ai-data-platform:8000
     ports:
       - "${GATEWAY_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/health')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -65,14 +65,14 @@ services:
       MATCH_VECTOR_WEIGHT: ${MATCH_VECTOR_WEIGHT:-0.7}
       MATCH_ATTR_WEIGHT: ${MATCH_ATTR_WEIGHT:-0.3}
       MATCH_CANDIDATE_POOL: ${MATCH_CANDIDATE_POOL:-50}
-      MATCHING_API_URL: http://matching-api:8000
+      MATCHING_API_URL: http://ai-data-platform:8000
     ports:
       - "${MATCHING_PORT:-3002}:3002"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3002/health')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -101,33 +101,59 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3003/health')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  matching-api:
+  ai-data-platform:
     build:
       context: ./ai-data-platform
       dockerfile: api/Dockerfile
-    container_name: dqplus-matching-api
+    container_name: dqplus-ai-data-platform
+    # FPT key + embedder/chat model scoped to this service only (multilingual-e5-large,
+    # 1024-dim) — NOT via root .env, so `extract` (which needs a 1536 column) is untouched.
+    # DATABASE_URL below overrides the .env's local value (compose environment wins).
+    env_file:
+      - ./ai-data-platform/.env
     environment:
       DATABASE_URL: postgres://${DB_USER:-dealflow}:${DB_PASSWORD:-dealflow}@postgres:5432/${DB_NAME:-dealflow}
+      # Same secret as the gateway: the dashboard (GET /) is admin-only and
+      # verifies gateway-issued JWTs (role=admin, DB-provisioned).
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-a-real-environment}
     ports:
       - "${MATCHING_API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
 
+  # web is internal-only and scalable (no container_name / no published port) so
+  # multiple replicas can run side by side during a rolling deploy. The `proxy`
+  # service owns the public port and load-balances across replicas.
   web:
     build: ./frontend
-    container_name: dqplus-web
-    ports:
-      - "${WEB_PORT:-5173}:80"
+    expose:
+      - "80"
     depends_on:
       - gateway
       - matching-engine
       - extract
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  proxy:
+    image: nginx:1.27-alpine
+    container_name: dqplus-proxy
+    volumes:
+      - ./deploy/proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    depends_on:
+      - web
 
 volumes:
   pgdata:

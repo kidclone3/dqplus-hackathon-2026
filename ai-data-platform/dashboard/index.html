@@ -84,10 +84,60 @@
   .dot.busy { background: var(--warn); } .dot.idle { background: var(--good); }
   .dot.dead { background: var(--bad); } .dot.starting { background: var(--accent); }
   .costbar { height: 6px; background: var(--accent); border-radius: 3px; }
+
+  /* --- toggleable sidebar --- */
+  .layout { transition: grid-template-columns .3s ease; }
+  .layout.hide-left { grid-template-columns: 0 1fr 320px; }
+  .layout.hide-left .col.left { display: none; }
+  #toggle-left-btn { padding: 4px 10px; font-size: 16px; line-height: 1; }
+
+  /* --- investor discovery workspace (/discover) --- */
+  .match-lab { position: relative; overflow: hidden;
+    background: linear-gradient(135deg, rgba(22,27,34,.5), rgba(31,111,235,.09)); border-color: #1f6feb44; }
+  .lab-kicker { color: var(--accent); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
+  .lab-title { margin: 6px 0 4px; max-width: 620px; font-size: 22px; line-height: 1.2; font-weight: 700;
+    text-transform: none; letter-spacing: -.01em; color: var(--fg); }
+  .lab-copy { margin: 0 0 14px; max-width: 660px; color: var(--muted); font-size: 12px; }
+  .query-box { display: flex; gap: 8px; align-items: stretch; }
+  .query-box textarea { width: 100%; min-height: 74px; resize: vertical; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; color: var(--fg); background: var(--bg);
+    font: 13px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; outline: none; }
+  .query-box textarea:focus { border-color: var(--accent); }
+  .query-box button { min-width: 130px; }
+  .prompt-chips { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+  .prompt-chip { background: var(--chip); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 99px; padding: 4px 10px; font-size: 11px; }
+  .discovery-summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 18px 0 10px; }
+  .discovery-summary h2 { margin: 0; color: var(--fg); }
+  .discovery-count { color: var(--accent); font-size: 12px; }
+  .candidate-list { display: grid; gap: 9px; }
+  .candidate { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel);
+    transition: border-color .18s ease, transform .18s ease; }
+  .candidate:hover { transform: translateY(-1px); border-color: var(--accent); }
+  .candidate-top { display: flex; align-items: center; gap: 9px; }
+  .candidate-name { font-weight: 600; margin-right: auto; }
+  .fit { min-width: 42px; padding: 4px 6px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 700;
+    color: var(--good); background: rgba(63,185,80,.13); border: 1px solid rgba(63,185,80,.27); }
+  .candidate-copy { color: var(--muted); font-size: 12px; margin: 7px 0; }
+  .candidate-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .candidate-actions button { padding: 4px 8px; font-size: 11px; }
+  .fit-slider-bar { display: flex; align-items: center; gap: 12px; padding: 8px 0 12px; }
+  .fit-slider-bar label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .fit-slider-bar input[type=range] { flex: 1; height: 5px; -webkit-appearance: none; appearance: none;
+    background: linear-gradient(90deg, var(--bad), var(--warn), var(--good)); border-radius: 99px; outline: none; cursor: pointer; }
+  .fit-slider-bar input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px;
+    border-radius: 50%; background: var(--fg); border: 3px solid var(--accent); cursor: grab; }
+  .fit-slider-bar input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%;
+    background: var(--fg); border: 3px solid var(--accent); cursor: grab; }
+  .fit-slider-val { width: 54px; padding: 4px; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--accent); text-align: center; background: var(--bg); font-size: 13px; font-weight: 700; outline: none; -moz-appearance: textfield; }
+  .fit-slider-val::-webkit-inner-spin-button, .fit-slider-val::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .fit-slider-val:focus { border-color: var(--accent); }
 </style>
 </head>
 <body>
 <header>
+  <button id="toggle-left-btn" class="ghost" title="Toggle sidebar" aria-label="Toggle sidebar">☰</button>
   <h1>Deal-flow Matchmaker</h1>
   <div class="stat">LLM cost <b id="hdr-cost">—</b></div>
   <div class="stat">/entity <b id="hdr-cpe">—</b></div>
@@ -133,8 +183,11 @@
 const $ = (id) => document.getElementById(id);
 let selected = null;
 
+// Served at "/" locally but under a prefix (e.g. /agent/) behind the VPS nginx —
+// prefix every absolute API path with wherever the page itself is mounted.
+const API_BASE = location.pathname.replace(/\/$/, "");
 async function j(path, opts) {
-  const r = await fetch(path, opts);
+  const r = await fetch(API_BASE + path, opts);
   if (!r.ok) throw new Error(path + " " + r.status);
   return r.json();
 }
@@ -247,6 +300,99 @@ function relRow(e) {
     ${e.source_url ? `<a class="src" href="${escapeAttr(e.source_url)}" target="_blank" rel="noopener">source ↗</a>` : ""}</div>`;
 }
 
+function graphRow(p) {
+  // p: {target_id, target_name, target_type, distance, path: [{from_id,to_id,kind,source_url,hop}]}
+  const viaKinds = p.path.map(h => h.kind).join(" → ");
+  const firstSrc = (p.path.find(h => h.source_url) || {}).source_url;
+  return `<div class="rel">
+    <a class="lnk" data-goto="${escapeAttr(p.target_id)}" href="#">${escapeHtml(p.target_name)}</a>
+    <span class="badge">${escapeHtml((p.target_type || "").replace("_", " "))}</span>
+    <span class="arrow">${p.distance}-hop</span>
+    <span class="rk">${escapeHtml(viaKinds)}</span>
+    ${firstSrc ? `<a class="src" href="${escapeAttr(firstSrc)}" target="_blank" rel="noopener">source ↗</a>` : ""}
+  </div>`;
+}
+
+// ---- investor discovery workspace (GET /discover) --------------------------
+function defaultDiscoveryQuery(ent) {
+  const p = ent.profile || {};
+  const norm = p.normalized || {};
+  const sectors = (p.sectors || norm.sectors || []).map(pick).filter(Boolean);
+  const country = pick(p.country) || pick((p.seed || {}).country) || "";
+  return `Find investors for ${ent.name}${sectors.length ? ` in ${sectors.join(", ")}` : ""}${country ? `, active in ${country}` : ""}.`;
+}
+
+// Keeps the workspace usable against an older running API until /discover ships.
+async function discoveryFallback(startup, query) {
+  const words = s => new Set((String(s).toLowerCase().match(/[a-z0-9][a-z0-9_-]{1,}/g) || []));
+  const sp = startup.profile || {};
+  const startupTerms = words(JSON.stringify(sp)), queryTerms = words(query);
+  const country = String(pick(sp.country) || pick((sp.seed || {}).country) || "").toLowerCase();
+  const investors = await j("/entities?type=investor");
+  const profiles = await Promise.all(investors.map(async inv =>
+    ({ ...inv, ...(await j("/entities/" + encodeURIComponent(inv.id))) })));
+  return { startup_id: startup.id, startup_name: startup.name, query, results: profiles.map(inv => {
+    const p = inv.profile || {}, text = `${inv.name} ${JSON.stringify(p)}`.toLowerCase(), terms = words(text);
+    const queryHits = [...queryTerms].filter(t => terms.has(t));
+    const profileHits = [...startupTerms].filter(t => terms.has(t) && !["country", "sectors", "startup"].includes(t));
+    let score = 24 + Math.min(28, queryHits.length * 9) + Math.min(22, profileHits.length * 5);
+    if (country && text.includes(country)) score += 18;
+    const signals = [p.country, p.note, p.sectors, p.focus, p.stage].filter(Boolean)
+      .map(x => Array.isArray(x) ? x.join(", ") : String(x));
+    return { id: inv.id, name: inv.name, type: "investor", status: inv.status, score: Math.min(100, score),
+      query_hits: queryHits, profile_hits: profileHits, signals: signals.slice(0, 3), existing_match: false, rationale: null };
+  }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 10) };
+}
+
+function applyFitFilter(minScore) {
+  let visible = 0;
+  document.querySelectorAll(".candidate[data-score]").forEach(el => {
+    const show = Number(el.dataset.score) >= minScore;
+    el.style.display = show ? "" : "none";
+    if (show) visible++;
+  });
+  const countEl = document.querySelector(".discovery-count");
+  if (countEl) countEl.textContent = `${visible} candidates`;
+}
+
+async function runDiscovery(startup, query) {
+  const host = $("discovery-results");
+  if (!host) return;
+  host.innerHTML = `<div class="empty">Finding matching investors and signals…</div>`;
+  try {
+    let data;
+    try { data = await j(`/discover?startup_id=${encodeURIComponent(startup.id)}&query=${encodeURIComponent(query)}&limit=10`); }
+    catch (e) { data = await discoveryFallback(startup, query); }
+    const results = data.results || [];
+    const minScore = results.length ? Math.min(...results.map(r => r.score)) : 0;
+    host.innerHTML = `<div class="discovery-summary"><h2>Investor candidates</h2><span class="discovery-count">${results.length} candidates</span></div>
+      <div class="fit-slider-bar"><label>Min fit</label>
+        <input type="range" id="fit-range" min="0" max="100" value="${minScore}" step="1" aria-label="Minimum fit score">
+        <input type="number" class="fit-slider-val" id="fit-val" min="0" max="100" value="${minScore}" step="1" aria-label="Minimum fit score">
+        <span class="conf">%</span></div>
+      <div class="candidate-list">${results.map(r => `<article class="candidate" data-score="${r.score}">
+        <div class="candidate-top"><span class="candidate-name">${escapeHtml(r.name)}</span><span class="badge">investor</span><span class="fit">${r.score}%</span></div>
+        <div class="candidate-copy">${escapeHtml(r.rationale || (r.signals || []).join(" · ") || "Profile found — open the investor to see details.")}</div>
+        <div class="candidate-actions"><div class="chips">${(r.query_hits || []).slice(0, 3).map(x => `<span class="badge">${escapeHtml(x)}</span>`).join("")}${r.existing_match ? `<span class="badge ready">ranked</span>` : ""}</div>
+          <button class="ghost open-investor" type="button" data-id="${escapeAttr(r.id)}">View profile</button></div>
+      </article>`).join("") || `<div class="empty">No matching investor profiles yet.</div>`}</div>`;
+    host.querySelectorAll(".open-investor").forEach(button =>
+      button.onclick = () => { selected = button.dataset.id; loadEntities(); loadDetail(); });
+    if (results.length) {
+      applyFitFilter(minScore);
+      const syncFilter = (val, fromInput = false) => {
+        val = Math.max(0, Math.min(100, Number(val) || 0));
+        if (!fromInput) $("fit-val").value = val;
+        $("fit-range").value = val;
+        applyFitFilter(val);
+      };
+      $("fit-range").addEventListener("input", (e) => syncFilter(e.target.value, false));
+      $("fit-val").addEventListener("input", (e) => { if (e.target.value !== "") syncFilter(e.target.value, true); });
+      $("fit-val").addEventListener("change", (e) => syncFilter(e.target.value, false));
+    }
+  } catch (e) { host.innerHTML = `<div class="empty">Could not discover investors: ${escapeHtml(e.message)}</div>`; }
+}
+
 async function loadDetail() {
   if (!selected) return;
   let ent;
@@ -265,9 +411,31 @@ async function loadDetail() {
   try {
     matches = await j("/matches?" + (isStartup ? "startup_id=" : "partner_id=") + encodeURIComponent(selected));
   } catch (e) { /* matches optional */ }
+  let graphMatches = [];
+  try {
+    const gm = await j("/entities/" + encodeURIComponent(selected) + "/graph-matches?max_hops=2");
+    graphMatches = gm.matches || [];
+  } catch (e) { /* graph-matches optional */ }
+
+  // query-first matchmaking workspace for startups (/discover)
+  let html = isStartup ? `<section class="card match-lab">
+    <div class="lab-kicker">Investor discovery</div>
+    <h2 class="lab-title">Turn this startup into a conversation with the right investors.</h2>
+    <p class="lab-copy">Describe the round, stage, sector or region. The system builds a transparent shortlist from investor profiles; use the outreach run when you're ready to rank and draft.</p>
+    <div class="query-box">
+      <textarea id="investor-query" aria-label="Investor discovery query" placeholder="e.g. seed investors in Southeast Asia for an enterprise AI startup">${escapeHtml(defaultDiscoveryQuery(ent))}</textarea>
+      <button id="find-investors" type="button">Find investors</button>
+    </div>
+    <div class="prompt-chips">
+      <button class="prompt-chip" type="button" data-prompt="Seed investors in Vietnam for AI startups">Seed Vietnam</button>
+      <button class="prompt-chip" type="button" data-prompt="Investors focused on enterprise software and AI">Enterprise AI</button>
+      <button class="prompt-chip" type="button" data-prompt="Early-stage investors active in Southeast Asia">Southeast Asia</button>
+    </div>
+    <div id="discovery-results"></div>
+  </section>` : "";
 
   // header card
-  let html = `<div class="card">
+  html += `<div class="card">
     <div class="match-head">
       <span class="pname">${escapeHtml(ent.name)}</span>
       <span class="badge">${escapeHtml(ent.type.replace("_", " "))}</span>
@@ -311,6 +479,11 @@ async function loadDetail() {
     html += `<div class="card"><div class="subhead" style="border:0;padding:0;margin:0 0 8px">Relationships (${edges.length})</div>
       ${edges.map(relRow).join("")}</div>`;
 
+  // graph-discovered matches (name-resolved BFS over edges, up to 2 hops — spine/graph.py)
+  if (graphMatches.length)
+    html += `<div class="card"><div class="subhead" style="border:0;padding:0;margin:0 0 8px">Graph-discovered matches (${graphMatches.length})</div>
+      ${graphMatches.map(graphRow).join("")}</div>`;
+
   // matches — ranked partners for a startup, reverse (interested startups) for a partner
   if (!matches.length) {
     html += `<div class="empty">No matches yet${isStartup ? ". Trigger a run, then start the supervisor with --drain." : " for this partner."}</div>`;
@@ -327,6 +500,13 @@ async function loadDetail() {
   $("detail").innerHTML = html;
   $("detail").querySelectorAll("a[data-goto]").forEach(a =>
     a.onclick = (ev) => { ev.preventDefault(); selected = a.dataset.goto; loadEntities(); loadDetail(); });
+  if (isStartup) {
+    const queryBox = $("investor-query");
+    $("find-investors").onclick = () => runDiscovery(ent, queryBox.value.trim());
+    $("detail").querySelectorAll(".prompt-chip").forEach(button =>
+      button.onclick = () => { queryBox.value = button.dataset.prompt; queryBox.focus(); });
+    await runDiscovery(ent, queryBox.value.trim());
+  }
 }
 
 function escapeHtml(s) {
@@ -383,7 +563,8 @@ async function loadEvents() {
 async function refresh() {
   try {
     await Promise.all([loadEntities(), loadCosts(), loadHealth(), loadEvents()]);
-    if (selected) await loadDetail();
+    // Detail is not re-rendered on the interval: it holds the discovery query box
+    // and fit slider, which a re-render would reset. It reloads on selection/navigation.
     $("pulse").textContent = "live · " + new Date().toLocaleTimeString();
     $("pulse").style.color = "var(--good)";
   } catch (e) {
@@ -403,6 +584,9 @@ $("run-btn").onclick = async () => {
   } catch (e) { $("pulse").textContent = "run failed: " + e.message; }
   finally { $("run-btn").disabled = false; refresh(); }
 };
+
+$("toggle-left-btn").onclick = () =>
+  document.querySelector(".layout").classList.toggle("hide-left");
 
 refresh();
 setInterval(refresh, 3000);

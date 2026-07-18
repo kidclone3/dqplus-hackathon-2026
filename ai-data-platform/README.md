@@ -48,6 +48,7 @@ Copy `.env.example` to `.env` and adjust:
 | Var | Default | Purpose |
 |-----|---------|---------|
 | `DATABASE_URL` | `postgres://dealflow:dealflow@localhost:5432/dealflow` | Postgres DSN |
+| `JWT_SECRET` | *(empty)* | When set, the dashboard (`GET /`) requires a gateway JWT with `role=admin` (via `?token=`, `Authorization: Bearer`, or the cookie it sets). Admins are provisioned only by direct DB update. Empty → dashboard open (standalone dev). |
 | `AGENT_MODEL` | `deepseek/deepseek-v4-flash` | Pinned model (all agents) |
 | `MAX_CONCURRENCY` | `4` | Global cap across agent pools |
 | `AGENT_TIMEOUT` | `240` | Per-turn wall clock (seconds) |

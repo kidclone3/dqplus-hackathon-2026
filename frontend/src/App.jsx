@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Header from './components/Header.jsx';
+import Landing from './views/Landing.jsx';
 import AuthGate from './views/AuthGate.jsx';
 import ProfileForm from './views/ProfileForm.jsx';
 import Matches from './views/Matches.jsx';
@@ -59,6 +60,7 @@ function persistProfileMirror(username, form, status) {
 
 export default function App() {
   const [session, setSession] = useState(() => loadSession());
+  const [entered, setEntered] = useState(false);
   const role = session && session.user.role === 'investor' ? 'investor' : 'startup';
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState('draft');
@@ -281,6 +283,7 @@ export default function App() {
   }
 
   if (!session) {
+    if (!entered) return <Landing onEnter={() => setEntered(true)} />;
     return <AuthGate onAuthed={handleAuthed} />;
   }
 

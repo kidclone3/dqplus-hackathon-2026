@@ -20,14 +20,11 @@
 }
 
 .vn-auth-tile {
-  display: grid;
-  place-items: center;
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: var(--accent);
-  color: #fff;
-  font: 600 17px var(--font-ui);
+  object-fit: cover;
+  flex: none;
 }
 
 .vn-auth-lockup {

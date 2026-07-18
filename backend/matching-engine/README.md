@@ -4,13 +4,13 @@ Matches founders and investors via pgvector similarity plus attribute
 scoring (sector/stage/region), and proxies the ranked composite match list
 from the Python matcher in `ai-data-platform/`.
 
-Stack: Express, `pg` (raw Postgres + pgvector).
+Stack: FastAPI, `asyncpg` (raw Postgres + pgvector), `httpx` (proxy calls).
 
 ## Run
 
 ```bash
-npm install
-npm run dev          # http://localhost:3002, --watch reload
+uv sync
+uv run uvicorn app.main:app --reload --port 3002   # http://localhost:3002
 ```
 
 ## Configuration
@@ -33,10 +33,22 @@ Copy `.env.example` to `.env`:
 - `GET /matches/founders/:userId/investors` — local pgvector + attribute
   scoring, query params `limit`, `sector`, `stage`, `region`
 - `GET /matches/investors/:userId/founders` — same, reversed roles
+- `GET /health` — `{"status":"ok","db":"connected"}` or 503 `{"status":"degraded","db":"unavailable"}`
 
 ## Structure
 
-- `src/routes/match.routes.js` — the three routes above
-- `src/services/matching.service.js` — candidate lookup + scoring orchestration
-- `src/services/scoring.js` — vector + attribute scoring blend
-- `src/config/db.js` — Postgres pool
+- `app/main.py` — FastAPI app, lifespan (DB pool), `/health`, error handlers
+- `app/routers/matches.py` — the three routes above
+- `app/services/matching.py` — candidate lookup + scoring orchestration
+- `app/services/scoring.py` — vector + attribute scoring blend
+- `app/config.py` — env-driven configuration
+- `app/db.py` — asyncpg pool
+
+## Tests
+
+```bash
+uv run pytest tests/e2e --json-report --json-report-file=tests/artifacts/test_results.json -v
+```
+
+See `tests/README.md` for the coverage matrix. Runs against a real
+Postgres + pgvector instance — no DB mocking.

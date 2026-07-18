@@ -4,17 +4,16 @@ REST API gateway fronting VietNexus: user auth and profile management. The
 `frontend/` and `mobile/` clients talk to this service; it forwards match
 requests to `matching-engine` and can call `agent/extract` for enrichment.
 
-Stack: Express, Sequelize (Postgres), JWT auth, bcrypt, Swagger/OpenAPI docs.
+Stack: FastAPI, asyncpg (Postgres), JWT auth, bcrypt, OpenAPI docs.
 
 ## Run
 
 ```bash
-npm install
-npm run dev          # http://localhost:3000, --watch reload
+uv sync
+uv run uvicorn app.main:app --port 3000 --reload
 ```
 
-Swagger UI is served per `src/config/swagger.js` (check console output on
-boot for the exact path).
+Docs are served at `/docs`.
 
 ## Configuration
 
@@ -31,16 +30,26 @@ Copy `.env.example` to `.env`:
 
 ## Structure
 
-- `src/app.js` / `src/index.js` — Express app + entrypoint
-- `src/routes/` — `auth.routes.js` (register/login), `profile.routes.js` (CRUD, authenticated), `matches.routes.js` (forward to the Python matching API)
-- `src/services/` — `auth.service.js`, `profile.service.js`
-- `src/middleware/` — `authenticate.js` (JWT), `authorize.js` (role checks), `errorHandler.js`
-- `src/models/` — Sequelize models (`user.model.js`, `profile.model.js`)
-- `src/config/` — `database.js` (Sequelize/Postgres), `swagger.js` (OpenAPI)
+- `app/main.py` — FastAPI app, CORS, exception handlers, lifespan (DB pool + schema bootstrap), `/health`
+- `app/routers/` — `auth.py` (register/login/me), `profiles.py` (CRUD, authenticated), `matches.py` (forward to the Python matching API)
+- `app/services/` — `auth_service.py`, `profile_service.py`
+- `app/deps.py` — JWT auth dependency, JSON body parsing
+- `app/security.py` — bcrypt hashing, JWT issue/decode
+- `app/db.py` — asyncpg pool + idempotent DDL bootstrap (replaces `sequelize.sync`)
+- `app/config.py` — env vars
 
 ## Endpoints
 
-- `POST /auth/register`, `POST /auth/login` — roles: `founder`, `investor`
+- `POST /auth/register`, `POST /auth/login`, `GET /auth/me` — roles: `founder`, `investor` (an `admin` role exists in the DB but is provisioned only by a direct DB write, never through `/auth/register`)
 - `/profiles` — authenticated CRUD, linked to the current user
 - `GET /matches` — forwarded as-is (query string included, e.g. `?startup_id=...`) to
   the Python matching API's `/matches`
+
+## Tests
+
+Real Postgres, no DB mocking. See `tests/README.md` for the AC/BR/EF coverage
+matrix.
+
+```bash
+uv run pytest tests/e2e --json-report --json-report-file=tests/artifacts/test_results.json -v
+```

@@ -1,0 +1,40 @@
+FOUNDER_SCHEMA = {
+    "name": "founder_profile",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "company_name": {"type": ["string", "null"]},
+            "industry": {"type": "array", "items": {"type": "string"}},
+            "stage": {
+                "type": ["string", "null"],
+                "enum": ["pre-seed", "seed", "series-a", "series-b", "growth", None],
+            },
+            "country": {"type": ["string", "null"]},
+            "target_regions": {"type": "array", "items": {"type": "string"}},
+            "team_size": {"type": ["integer", "null"]},
+            "arr_usd": {"type": ["number", "null"]},
+            "funding_ask_usd": {"type": ["number", "null"]},
+            "business_model": {
+                "type": ["string", "null"],
+                "enum": ["b2b", "b2c", "b2b2c", "marketplace", None],
+            },
+            "product_description": {"type": ["string", "null"]},
+            "traction_summary": {"type": ["string", "null"]},
+        },
+        "required": [
+            "company_name",
+            "industry",
+            "stage",
+            "country",
+            "target_regions",
+            "team_size",
+            "arr_usd",
+            "funding_ask_usd",
+            "business_model",
+            "product_description",
+            "traction_summary",
+        ],
+    },
+}

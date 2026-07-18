@@ -1,14 +1,15 @@
-# extract-agent :3003 — builds extracted_profiles rows + embeddings (Express).
+# extract-agent :3003 — builds extracted_profiles rows + embeddings (FastAPI).
 # Runs schema.sql (CREATE EXTENSION vector, extracted_profiles) at startup.
-FROM node:22-slim
+FROM python:3.12-slim
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 WORKDIR /app
-ENV NODE_ENV=production
+ENV UV_COMPILE_BYTECODE=1
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
-COPY src ./src
+COPY app ./app
 
 EXPOSE 3003
-CMD ["node", "src/index.js"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3003"]

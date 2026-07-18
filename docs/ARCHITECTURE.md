@@ -34,7 +34,7 @@ For the *why* behind each technology choice, see [`TECHNOLOGY.md`](TECHNOLOGY.md
                     └─────────────────────────────────────────────────┘
 ```
 
-Three Node/Express services own the app's live path; a Python spine (the AI Data Platform)
+Three Python/FastAPI services own the app's live path; a Python spine (the AI Data Platform)
 shares the same Postgres for research-grade, evidence-cited matchmaking. `nginx` on the VPS
 is the single public entry point and routes by URL prefix.
 
@@ -47,8 +47,9 @@ The front door for identity and profile data.
 - **Auth**: `POST /auth/register`, `POST /auth/login` (bcrypt + JWT), `GET /auth/me`.
 - **Profiles** (JWT-protected): `POST /profiles`, `GET /profiles/:id`, `PATCH /profiles/:id`.
 - **Health**: `GET /health` (checks DB connectivity).
-- ORM: **Sequelize**. In non-production it runs `sync({ alter: true })` to keep the schema
-  aligned. Swagger docs are wired via `swagger-jsdoc` / `swagger-ui-express`.
+- DB access: **asyncpg** with raw SQL; an idempotent DDL bootstrap at startup keeps the
+  schema aligned (and widens `users.role` with `admin`). Swagger docs are FastAPI-native
+  at `/docs`.
 - Owns the `users` and `profiles` tables.
 
 ### 2.2 Extract Agent — `backend/agent/extract` (:3001 canonical, **:3003 on this machine**)
@@ -120,9 +121,11 @@ engine it auto-calls extraction, then retries the match request once.
 
 All services share **one Postgres database (`dealflow`)**.
 
-**`users`** (gateway) — credentials + `role` (`founder` | `investor`), links to a profile.
+**`users`** (gateway) — credentials + `role` (`founder` | `investor` | `admin`), links to a
+profile. `admin` is never accepted by `/auth/register` — it is provisioned only by a direct
+DB update (`UPDATE users SET role='admin' ...`) and unlocks the AI Data Platform dashboard.
 
-**`profiles`** (gateway, Sequelize) — the structured onboarding form: `company_name`,
+**`profiles`** (gateway) — the structured onboarding form: `company_name`,
 `stage`, `industry`, `where_you_operate`, `website[]`, `description_product`, contact,
 and investor economics (`avg_initial_investment`, `annual_investment_count`,
 `avg_holding_period`, `year_founded`, `num_of_employees`, …). UUID PK, `underscored`,
@@ -157,21 +160,50 @@ The AI Data Platform adds its own `core` / `orchestration` / `control_plane` sch
 
 - **Public URL**: `https://dqplus.ddns.net`.
 - **VPS** (`13.250.9.139`, Ubuntu): `nginx` terminates TLS and routes by prefix to
-  **autossh reverse tunnels** from the dev machine (`192.168.0.79`):
-  - `/` → `8443` → vite preview (`:5173`)
+  **autossh reverse tunnels** from the dev machine (managed by `deploy/port-forward.sh`,
+  targeting `127.0.0.1`):
+  - `/` → `8443` → `proxy` container (`:5173`)
   - `/api/agents/`, `/api/extract/` → `5002` → extract agent (`:3003`)
   - `/api/matches/` → `5003` → matching engine (`:3002`)
   - `/api/backend/`, `/api/` fallback → `5000` → gateway (`:3000`)
-- Production build uses `VITE_API_BASE=/api` (same-origin). Vite preview must allow the host
-  (`allowedHosts: ['dqplus.ddns.net']`).
+- Production build uses `VITE_API_BASE=/api` (same-origin).
 - **Local dev**: `./start.sh` boots Postgres (pgvector) via docker-compose, copies
   `.env.example → .env` where missing, and launches all three Node services with tailed
   logs into `logs/`.
+
+### 6.1 Zero-downtime web deploys
+
+The tunnel lands on a single local port (`:5173`), and only one container can bind a
+host port — so a naive `docker compose up --build web` stops the old container before
+the new one binds, dropping requests. To avoid that, the `web` service is **internal-only
+and scalable** (no `container_name`, no published port, `expose: 80`, IPv4 healthcheck),
+and a tiny **`proxy`** service (`nginx:1.27-alpine`, config in `deploy/proxy.conf`) owns
+`:5173` and load-balances across `web` replicas:
+
+```
+VPS nginx → :8443 → SSH tunnel → proxy (:5173) ─┬─ web (old replica)
+                                                └─ web (new replica)
+```
+
+The proxy resolves `web` per request via Docker DNS (`resolver 127.0.0.11`, variable
+`proxy_pass`), so scaled replicas are discovered automatically, and `proxy_next_upstream`
+with a short `proxy_connect_timeout` retries a sibling if one is draining.
+
+**Deploy a frontend change** with `bash deploy/rolling-deploy.sh`: build → start a 2nd
+`web` replica → wait healthy → drain the old replica by container id → back to one. Always
+≥1 healthy backend behind the proxy (verified `ok=800 fail=0` under an in-flight probe).
 
 **Operational notes**
 
 - `docker-compose.yml` pins `pgvector/pgvector:pg16` so the `vector` extension is durable
   across container recreation (an earlier apt-installed pgvector in a sibling container was
   ephemeral).
-- autossh tunnels must use an **absolute** key path with `-f`; a relative path breaks after
-  daemonizing. The VPS sshd rate-limits rapid reconnects (~1–2 min lockout).
+- autossh tunnels must use an **absolute** key path with `-f` and target `127.0.0.1`
+  (WSL2 mirrored networking makes docker-published ports unreachable via the LAN IP). The
+  VPS sshd rate-limits rapid reconnects (~1–2 min lockout).
+- Container healthchecks hit `127.0.0.1`, not `localhost` — `localhost` resolves to `::1`
+  and the services bind IPv4 only, which would report a healthy container as unhealthy.
+- `docker compose --scale web=N` scales **down** by removing the newest replica, so the
+  rolling script drains the *old* replica by id rather than scaling down.
+- Change `deploy/proxy.conf` with `docker exec dqplus-proxy nginx -s reload` (zero
+  downtime); recreating the `proxy` container briefly drops `:5173`.

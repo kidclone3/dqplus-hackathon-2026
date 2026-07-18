@@ -62,7 +62,7 @@ export default function AuthGate({ onAuthed }) {
     <div className="vn-auth-page" ref={rootRef}>
       <div className="vn-auth-col">
         <div className="vn-auth-logo rise">
-          <span className="vn-auth-tile">V</span>
+          <img className="vn-auth-tile" src="/logo.png" alt="VietNexus" />
           <span className="vn-auth-lockup">
             <b>VietNexus</b>
             <small>INNOVATION OS</small>

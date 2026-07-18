@@ -1,14 +1,13 @@
-# gateway :3000 — auth + profiles (Express/Sequelize). node:22-slim (glibc) so
-# bcrypt's prebuilt native binary is used instead of compiling from source.
-FROM node:22-slim
+# gateway :3000 — auth + profiles (FastAPI/asyncpg).
+FROM python:3.12-slim
 
 WORKDIR /app
-# NODE_ENV deliberately NOT set to production: src/index.js only runs
-# sequelize.sync({ alter: true }) — the app's sole schema mechanism — outside production.
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-COPY src ./src
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+
+COPY app ./app
 
 EXPOSE 3000
-CMD ["node", "src/index.js"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3000"]

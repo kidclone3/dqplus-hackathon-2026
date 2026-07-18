@@ -22,16 +22,16 @@ cited sources rather than guessed.
 |---|---|---|
 | [`frontend/`](frontend/README.md) | Web app — auth, profile form, matches, match detail | Vite + React 18 + GSAP |
 | [`mobile/`](mobile/README.md) | Companion mobile app (NFC profile card, matches) | Expo + React Native |
-| [`backend/gateway/`](backend/gateway/README.md) | Auth + profile REST API, fronts the other services | Express + Sequelize + Postgres |
-| [`backend/matching-engine/`](backend/matching-engine/README.md) | pgvector similarity + attribute scoring; proxies to the Python matcher | Express + pg |
-| [`backend/agent/extract/`](backend/agent/extract/README.md) | Extracts structured founder/investor info, stores embeddings | Express + OpenAI + pgvector |
+| [`backend/gateway/`](backend/gateway/README.md) | Auth + profile REST API, fronts the other services | FastAPI + asyncpg + Postgres |
+| [`backend/matching-engine/`](backend/matching-engine/README.md) | pgvector similarity + attribute scoring; proxies to the Python matcher | FastAPI + asyncpg |
+| [`backend/agent/extract/`](backend/agent/extract/README.md) | Extracts structured founder/investor info, stores embeddings | FastAPI + OpenAI + pgvector |
 | [`backend/agent/crawler/`](backend/agent/crawler/README.md) | Source-crawling agent (scaffold, not yet implemented) | — |
 | [`ai-data-platform/`](ai-data-platform/README.md) | Deal-flow matchmaker: sourced, cited, fact-checked matching pipeline + dashboard | Python (uv) + Postgres |
 | `web/admin/`, `web/client/` | Reserved scaffolding, not yet built out | — |
 
 `frontend/` and `ai-data-platform/` are the actively developed web app and matching
-pipeline; `backend/*` is the Node API layer the web/mobile clients talk to, with
-`/matches` forwarded to the Python matching API in `ai-data-platform/`.
+pipeline; `backend/*` is the Python (FastAPI) API layer the web/mobile clients talk to,
+with `/matches` forwarded to the Python matching API in `ai-data-platform/`.
 
 ## Quick start
 
@@ -64,9 +64,31 @@ The `ai-data-platform/migrations` are applied automatically the first time the
 `pgdata` volume is created; the gateway and extract agent create their own
 tables at startup.
 
+### Deploying updates to a live site (zero downtime)
+
+The `web` service runs internal-only behind a small `proxy` (nginx) that owns
+host port `5173` and load-balances across `web` replicas via Docker DNS. To ship
+a frontend change **without dropping a single request**:
+
+```bash
+bash deploy/rolling-deploy.sh
+```
+
+It builds the new image, starts a second `web` replica alongside the running one,
+waits for it to become healthy, then drains the old replica — the proxy always
+has a healthy backend. Verified with an in-flight request probe (`ok=800 fail=0`).
+
+- **Do not** run `docker compose up -d --build web` for a live update — a single
+  container owns the port, so it stops before the new one binds (a few seconds of
+  errors). Use the script.
+- To change `deploy/proxy.conf`, apply it with `docker exec dqplus-proxy nginx -s reload`
+  (zero downtime). Recreating the `proxy` container briefly drops port `5173`.
+
+See [`docs/ARCHITECTURE.md` §6](docs/ARCHITECTURE.md#6-deployment) for the full topology.
+
 ### Hybrid: postgres in Docker, services on the host
 
-Requires Docker (for Postgres/pgvector) and Node.js.
+Requires Docker (for Postgres/pgvector) and [`uv`](https://docs.astral.sh/uv/) (Python 3.12).
 
 ```bash
 ./start.sh

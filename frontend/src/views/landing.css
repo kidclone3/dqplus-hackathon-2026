@@ -1,0 +1,536 @@
+/* Landing page — reuses the design tokens and button system from styles.css */
+
+.vn-landing {
+  --dot-startup: #3f8f6b;
+  --dot-vc: #b08636;
+  --dot-corp: #3f6c9c;
+  --dot-uni: #7a5aa6;
+  --dot-research: #3f8f8f;
+  --dot-gov: #a65a6b;
+}
+
+.vn-landing a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* Large CTA variants built on the app's .btn / .btn-primary / .btn-ghost */
+.vn-landing .btn-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 26px;
+  font-size: 15px;
+  border-radius: 12px;
+}
+
+.vn-landing .btn-hero {
+  height: 56px;
+  padding: 0 30px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.vn-landing .btn-on-dark {
+  background: #fff;
+  color: #12241d;
+  border: 0;
+}
+
+.vn-landing .btn-arrow {
+  font-size: 1.1em;
+}
+
+/* ── Header ── */
+.vn-landing-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 66px;
+  padding: 0 clamp(20px, 5vw, 56px);
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(246, 245, 241, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.vn-landing-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.vn-landing-brand img {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  object-fit: cover;
+  flex: none;
+}
+
+.vn-landing-lockup {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.vn-landing-lockup b {
+  font: 700 16px var(--font-ui);
+  letter-spacing: -0.01em;
+}
+
+.vn-landing-lockup small {
+  color: var(--muted);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+}
+
+.vn-landing-nav {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+}
+
+.vn-landing-nav a {
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.vn-landing-nav a:hover {
+  color: var(--ink);
+}
+
+.vn-landing-nav .btn {
+  height: 38px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 13.5px;
+}
+
+/* ── Layout helpers ── */
+.vn-landing-wrap {
+  max-width: 1180px;
+  margin: auto;
+  padding: clamp(48px, 7vw, 88px) clamp(20px, 5vw, 56px);
+}
+
+.vn-landing section + section {
+  border-top: 1px solid var(--border-soft);
+}
+
+.vn-landing .eyebrow-up {
+  color: var(--faint);
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.vn-landing .serif-h2 {
+  margin: 14px 0 0;
+  font: 400 clamp(26px, 3.4vw, 40px) / 1.2 var(--font-serif);
+  letter-spacing: -0.02em;
+  max-width: 760px;
+}
+
+/* ── Hero ── */
+.vn-hero {
+  background: var(--bg);
+}
+
+.vn-hero-inner {
+  max-width: 1240px;
+  margin: auto;
+  padding: clamp(56px, 8vw, 104px) clamp(20px, 5vw, 56px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+
+.vn-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 15px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 32px;
+}
+
+.vn-hero-badge .dot {
+  background: var(--accent);
+}
+
+.vn-hero h1 {
+  margin: 0;
+  font: 800 clamp(42px, 6.4vw, 80px) / 0.98 var(--font-ui);
+  letter-spacing: -0.035em;
+  color: #111;
+}
+
+.vn-hero h1 .accent {
+  color: var(--accent);
+}
+
+.vn-hero-lede {
+  margin: 30px 0 0;
+  max-width: 600px;
+  font: 400 clamp(17px, 1.5vw, 20px) / 1.6 var(--font-ui);
+  color: var(--text);
+}
+
+.vn-hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 40px;
+}
+
+/* ── Explained-match preview card (hero + live sections) ── */
+.vn-lp-card {
+  padding: 30px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--card);
+  box-shadow: 0 24px 60px rgba(24, 40, 32, 0.07);
+}
+
+.vn-lp-card .card-eyebrow {
+  color: var(--faint);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.vn-lp-org {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.vn-lp-avatar {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #fff;
+  font: 700 14px var(--font-ui);
+  flex: none;
+}
+
+.vn-lp-org .name {
+  font: 600 17px var(--font-ui);
+  color: var(--ink);
+}
+
+.vn-lp-org .meta {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vn-lp-evidence {
+  margin: 16px 0 0 15px;
+  padding-left: 29px;
+  border-left: 1px dashed #d8d5cb;
+}
+
+.vn-lp-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.vn-lp-tag {
+  padding: 7px 13px;
+  border: 1px solid #ecd8c4;
+  border-radius: 99px;
+  background: #fbf1e6;
+  color: #b26f34;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.vn-lp-evidence p {
+  margin: 16px 0 0;
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* Live explained match */
+.vn-live-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: center;
+}
+
+.vn-live-lede {
+  margin: 18px 0 28px;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.vn-live-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.vn-live-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.vn-live-title {
+  margin-top: 8px;
+  font: 400 24px var(--font-serif);
+}
+
+.vn-live-score {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  border-radius: 18px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 500 30px var(--font-serif);
+  flex: none;
+}
+
+.vn-bars {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vn-bar {
+  display: grid;
+  grid-template-columns: 96px 1fr 34px;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--body);
+}
+
+.vn-bar-track {
+  height: 6px;
+  border-radius: 4px;
+  background: var(--border-soft);
+  overflow: hidden;
+}
+
+.vn-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.vn-bar b {
+  text-align: right;
+}
+
+.vn-why {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-soft);
+}
+
+.vn-why-label {
+  color: var(--accent);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.vn-why p {
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.vn-live-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.vn-live-foot .accent {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Actors ── */
+.vn-actor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 14px;
+  margin-top: 36px;
+}
+
+.vn-actor {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.vn-actor .dot {
+  width: 9px;
+  height: 9px;
+}
+
+.vn-actor .title {
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.vn-actor .desc {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* ── How ── */
+.vn-how-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 40px;
+}
+
+.vn-how-card {
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card);
+}
+
+.vn-how-num {
+  font: 500 26px var(--font-serif);
+  color: var(--accent);
+}
+
+.vn-how-card h3 {
+  margin: 16px 0 8px;
+  font: 600 18px var(--font-ui);
+}
+
+.vn-how-card p {
+  margin: 0;
+  color: var(--text);
+  font-size: 14.5px;
+  line-height: 1.62;
+}
+
+/* ── Closing CTA ── */
+.vn-closing {
+  max-width: 1180px;
+  margin: auto;
+  padding: clamp(20px, 4vw, 40px) clamp(20px, 5vw, 56px) clamp(64px, 9vw, 110px);
+}
+
+.vn-closing-box {
+  padding: clamp(40px, 6vw, 72px);
+  border-radius: 26px;
+  background: #12241d;
+  color: #fff;
+  text-align: center;
+}
+
+.vn-closing-box h2 {
+  margin: 0 auto;
+  max-width: 640px;
+  font: 400 clamp(28px, 4vw, 44px) / 1.14 var(--font-serif);
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
+.vn-closing-box p {
+  margin: 18px auto 34px;
+  max-width: 520px;
+  color: #b7c8c0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* ── Footer ── */
+.vn-landing-footer {
+  border-top: 1px solid var(--border-soft);
+}
+
+.vn-landing-footer-inner {
+  max-width: 1180px;
+  margin: auto;
+  padding: 30px clamp(20px, 5vw, 56px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.vn-landing-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+}
+
+.vn-landing-footer-brand img {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: none;
+}
+
+.vn-landing-footer-brand b {
+  font-weight: 700;
+}
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+  .vn-hero-inner,
+  .vn-live-grid {
+    grid-template-columns: 1fr;
+  }
+  .vn-landing-nav {
+    gap: 16px;
+  }
+  .vn-landing-nav a:not(.btn) {
+    display: none;
+  }
+}

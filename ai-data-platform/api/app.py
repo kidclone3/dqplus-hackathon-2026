@@ -9,18 +9,27 @@ Run: uv run uvicorn api.app:app --port 8000
 """
 from __future__ import annotations
 
+import asyncio
+import base64
+import hashlib
+import hmac
 import json
+import os
+import re
+import time
 import uuid
 from contextlib import asynccontextmanager
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from spine import outreach, telemetry
+from spine.graph import build_graph, path_to_dict
+from spine.matcher import embedding_matcher
 from spine.store import Store
 
 log = telemetry.get_logger("api")
@@ -28,6 +37,7 @@ _DASHBOARD = Path(__file__).resolve().parent.parent / "dashboard" / "index.html"
 
 # Partner entity types (spec §5.1). Everything else is a startup.
 PARTNER_TYPES = ["investor", "corporation", "university", "research_institution"]
+_QUERY_WORDS = re.compile(r"[a-z0-9][a-z0-9_-]{1,}", re.I)
 
 
 @asynccontextmanager
@@ -80,13 +90,59 @@ def _parse_jsonb(d: dict, *fields: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# dashboard
+# dashboard — admin-only when JWT_SECRET is set (gateway-issued HS256 tokens).
+# Admins exist only via direct DB update (UPDATE users SET role='admin'); the
+# gateway never registers them. Data endpoints below stay public — the frontend
+# match flow reads /matches directly.
 # --------------------------------------------------------------------------- #
 
+_JWT_SECRET = os.environ.get("JWT_SECRET", "")
+_ADMIN_COOKIE = "vn_admin"
+
+
+def _b64url_decode(seg: str) -> bytes:
+    return base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4))
+
+
+def _verify_admin_jwt(token: str) -> bool:
+    """Verify a gateway HS256 JWT and require role=admin. stdlib-only on purpose:
+    this service otherwise has no JWT dependency."""
+    try:
+        header_b64, payload_b64, sig_b64 = token.split(".")
+        if json.loads(_b64url_decode(header_b64)).get("alg") != "HS256":
+            return False
+        expected = hmac.new(
+            _JWT_SECRET.encode(), f"{header_b64}.{payload_b64}".encode(), hashlib.sha256
+        ).digest()
+        if not hmac.compare_digest(expected, _b64url_decode(sig_b64)):
+            return False
+        payload = json.loads(_b64url_decode(payload_b64))
+        if payload.get("exp") is not None and time.time() >= float(payload["exp"]):
+            return False
+        return payload.get("role") == "admin"
+    except Exception:
+        return False
+
+
 @app.get("/", include_in_schema=False)
-async def dashboard():
+async def dashboard(request: Request):
     if not _DASHBOARD.exists():
         raise HTTPException(404, "dashboard not built")
+    if _JWT_SECRET:
+        token = request.query_params.get("token")
+        if token:
+            if not _verify_admin_jwt(token):
+                raise HTTPException(403, "admin role required")
+            resp = RedirectResponse("/", status_code=303)
+            resp.set_cookie(_ADMIN_COOKIE, token, httponly=True, samesite="lax")
+            return resp
+        auth = request.headers.get("authorization", "")
+        token = auth.split(" ", 1)[1] if auth.lower().startswith("bearer ") else None
+        token = token or request.cookies.get(_ADMIN_COOKIE)
+        if not token:
+            raise HTTPException(401, "admin token required: open /?token=<admin jwt>")
+        if not _verify_admin_jwt(token):
+            raise HTTPException(403, "admin role required")
     return FileResponse(_DASHBOARD)
 
 
@@ -143,6 +199,34 @@ async def entity(entity_id: str):
     return out
 
 
+@app.get("/entities/{entity_id}/graph-matches")
+async def graph_matches(entity_id: str, max_hops: int = Query(2, ge=1, le=3),
+                        types: str | None = Query(
+                            None,
+                            description="Comma-separated target types, e.g. "
+                                        "'investor,corporation'. Default: all partner types.")):
+    """Relationship-graph discovery (spec §5.1: edges "consumed by future GraphRAG").
+
+    Unlike GET /entities/{id}'s `edges` list (which only shows edges whose dst_id was
+    already resolved at write time — rare in practice), this re-resolves edge targets by
+    name against the full current entity set and BFS-traverses up to `max_hops`. Answers
+    "which investors/corporations is this startup N hops from via a real relationship"
+    (shared funding rounds, partnerships, pilots) — a signal the LlmJudgeMatcher never
+    sees, since it only looks at one startup + its filtered candidate list at a time.
+    """
+    pool = _pool(app)
+    if await pool.fetchval("SELECT 1 FROM entities WHERE id = $1", entity_id) is None:
+        raise HTTPException(404, "entity not found")
+
+    entity_rows = await pool.fetch("SELECT id, type, name FROM entities")
+    edge_rows = await pool.fetch("SELECT src_id, dst_id, dst_name, kind, source_url FROM edges")
+
+    graph = build_graph([dict(r) for r in entity_rows], [dict(r) for r in edge_rows])
+    target_types = set(t.strip() for t in types.split(",") if t.strip()) if types else None
+    paths = graph.find_paths(entity_id, max_hops=max_hops, target_types=target_types)
+    return {"entity_id": entity_id, "max_hops": max_hops, "matches": [path_to_dict(p) for p in paths]}
+
+
 # --------------------------------------------------------------------------- #
 # matches
 # --------------------------------------------------------------------------- #
@@ -177,6 +261,80 @@ async def matches(startup_id: str | None = Query(None),
     return [_row(r) for r in rows]
 
 
+def _profile_text(profile: Any) -> str:
+    """Turn a sparse JSON profile into searchable text without assuming a schema."""
+    if isinstance(profile, str):
+        try:
+            profile = json.loads(profile)
+        except json.JSONDecodeError:
+            return profile
+    return json.dumps(profile or {}, ensure_ascii=False).lower()
+
+
+def _terms(value: Any) -> set[str]:
+    return set(_QUERY_WORDS.findall(_profile_text(value).lower()))
+
+
+@app.get("/discover")
+async def discover_investors(startup_id: str = Query(...), query: str = Query(""),
+                             limit: int = Query(12, ge=1, le=30)):
+    """Searchable investor discovery for the dashboard's matchmaking workspace.
+
+    This is intentionally a transparent, fast shortlist rather than a replacement for
+    the LLM ranking job: it combines profile overlap, location, natural-language query
+    terms, and any already-ranked match. The user can immediately explore candidates,
+    then use the normal outreach pipeline to create ranked/drafted matches.
+    """
+    pool = _pool(app)
+    startup = await pool.fetchrow(
+        "SELECT id, name, profile FROM entities WHERE id = $1 AND type = 'startup'", startup_id)
+    if startup is None:
+        raise HTTPException(404, "startup not found")
+
+    candidates = await pool.fetch(
+        "SELECT e.id, e.name, e.type, e.status, e.profile, m.composite, m.semantic, "
+        "m.sector_overlap, m.rationale_en, m.status AS match_status "
+        "FROM entities e LEFT JOIN matches m ON m.partner_id = e.id AND m.startup_id = $1 "
+        "WHERE e.type = 'investor' ORDER BY e.name", startup_id)
+    startup_profile = _profile_text(startup["profile"])
+    startup_terms = _terms(startup_profile)
+    query_terms = _terms(query)
+    startup_country = ""
+    try:
+        startup_country = str((json.loads(startup["profile"]) if isinstance(startup["profile"], str)
+                               else startup["profile"] or {}).get("country", "")).lower()
+    except (json.JSONDecodeError, AttributeError):
+        pass
+
+    from spine.matcher.semantic import calculate_fit_score
+
+    results = []
+    for row in candidates:
+        d = _parse_jsonb(_row(row), "profile")
+        candidate_text = f"{d['name']} {_profile_text(d.get('profile'))}".lower()
+        candidate_terms = _terms(candidate_text)
+        query_hits = query_terms & candidate_terms
+
+        # Semantic reciprocal fit score (spine.matcher.semantic). calculate_fit_score
+        # is fully synchronous and may make blocking urllib LLM/embedding calls, so run
+        # it off the event loop to avoid stalling the server.
+        fit_result = await asyncio.to_thread(calculate_fit_score, startup_profile, candidate_text)
+        score = fit_result["composite_score"]
+
+        profile = d.get("profile") or {}
+        signals = [str(profile[k]) for k in ("country", "note", "sectors", "focus", "stage") if profile.get(k)]
+        results.append({
+            "id": d["id"], "name": d["name"], "type": d["type"], "status": d["status"],
+            "score": min(100, score), "query_hits": sorted(query_hits),
+            "profile_hits": [], "signals": signals[:3],
+            "existing_match": d.get("composite") is not None,
+            "rationale": d.get("rationale_en"), "match_status": d.get("match_status"),
+        })
+    results.sort(key=lambda x: (-x["score"], x["name"]))
+    return {"startup_id": startup["id"], "startup_name": startup["name"], "query": query,
+            "results": results[:limit]}
+
+
 @app.get("/matches_v2")
 async def matches_v2(startup_id: str | None = Query(None),
                      partner_id: str | None = Query(None),
@@ -205,6 +363,71 @@ async def matches_v2(startup_id: str | None = Query(None),
         *args,
     )
     return [_row(r) for r in rows]
+
+
+# --------------------------------------------------------------------------- #
+# RAG match — pgvector match over the requester's normalized profile (POST body)
+# --------------------------------------------------------------------------- #
+
+def _target_types(default: list[str], types: str | None) -> list[str]:
+    """Override the default target types with a comma list, else keep the default."""
+    if types:
+        parsed = [t.strip() for t in types.split(",") if t.strip()]
+        if parsed:
+            return parsed
+    return default
+
+
+async def _rag_match(user_id: str, role: str, query_profile: dict, default_types: list[str],
+                     types: str | None, limit: int, rerank: bool,
+                     sector: str | None, stage: str | None, region: str | None) -> dict:
+    if not isinstance(query_profile, dict):
+        raise HTTPException(400, "request body must be the requester's normalized profile (JSON object)")
+    filters = {k: v for k, v in (("sector", sector), ("stage", stage), ("region", region)) if v}
+    result = await embedding_matcher.match(
+        _pool(app),
+        query_profile=query_profile,
+        target_types=_target_types(default_types, types),
+        limit=limit,
+        filters=filters,
+        rerank=rerank,
+    )
+    return {"userId": user_id, "role": role, "matches": result["matches"]}
+
+
+@app.post("/matches/founders/{user_id}/investors")
+async def match_founder_to_investors(user_id: str, body: dict,
+                                     limit: int = Query(10, ge=1, le=50),
+                                     rerank: bool = Query(False),
+                                     types: str | None = Query(
+                                         None,
+                                         description="Comma-separated target types to override "
+                                                     "the default. Default: 'investor'; may broaden "
+                                                     "to corporation,university,research_institution."),
+                                     sector: str | None = Query(None),
+                                     stage: str | None = Query(None),
+                                     region: str | None = Query(None)):
+    """RAG match a founder to partners. The requester's normalized profile is the JSON body;
+    it is embedded and KNN-searched against the partner corpus, then attribute-rescored."""
+    return await _rag_match(user_id, "founder", body, ["investor"], types, limit, rerank,
+                            sector, stage, region)
+
+
+@app.post("/matches/investors/{user_id}/founders")
+async def match_investor_to_founders(user_id: str, body: dict,
+                                     limit: int = Query(10, ge=1, le=50),
+                                     rerank: bool = Query(False),
+                                     types: str | None = Query(
+                                         None,
+                                         description="Comma-separated target types to override "
+                                                     "the default. Default: 'startup'."),
+                                     sector: str | None = Query(None),
+                                     stage: str | None = Query(None),
+                                     region: str | None = Query(None)):
+    """RAG match an investor to startups. The requester's normalized profile is the JSON body;
+    it is embedded and KNN-searched against the startup corpus, then attribute-rescored."""
+    return await _rag_match(user_id, "investor", body, ["startup"], types, limit, rerank,
+                            sector, stage, region)
 
 
 # --------------------------------------------------------------------------- #
