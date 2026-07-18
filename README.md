@@ -7,6 +7,15 @@ A founder or investor registers, fills a profile, and gets back reasoning-ranked
 matches with bilingual (VI/EN) fact-checked introduction drafts, grounded in
 cited sources rather than guessed.
 
+> Live: **https://dqplus.ddns.net**
+
+## Documentation
+
+- [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — **start here** — plain-language overview of the problem, solution, and users (non-technical).
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — services, request flow, data model, deployment.
+- [`docs/TECHNOLOGY.md`](docs/TECHNOLOGY.md) — the stack, the design decisions, and config.
+- [`ai-data-platform/docs/`](ai-data-platform/docs/) — the research-grade Python agent platform.
+
 ## Repo layout
 
 | Path | What it is | Stack |
