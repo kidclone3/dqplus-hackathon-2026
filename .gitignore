@@ -1,6 +1,7 @@
 node_modules/
 .env
 logs/
+*.pem
 
 # Python
 __pycache__/

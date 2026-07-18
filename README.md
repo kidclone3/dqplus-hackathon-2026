@@ -35,6 +35,37 @@ pipeline; `backend/*` is the Node API layer the web/mobile clients talk to, with
 
 ## Quick start
 
+### Everything in Docker
+
+```bash
+docker compose up -d --build
+```
+
+Brings up the whole stack: `postgres` (pgvector), `gateway`, `matching-engine`,
+`extract` agent, `matching-api` (the Python `ai-data-platform` API), and `web`
+(nginx serving the Vite build and proxying `/api/*` to the backends).
+
+| Service | URL |
+|---|---|
+| web (frontend + `/api` proxy) | http://localhost:5173 |
+| gateway | http://localhost:3000 |
+| matching engine | http://localhost:3002 |
+| extract agent | http://localhost:3003 |
+| matching API (Python) | http://localhost:8000 |
+| postgres | localhost:5433 |
+
+Ports and credentials come from `.env` (see `.env.example` — defaults are the
+deal-flow-matchmaker credentials `dealflow`/`dealflow`; every host port is
+overridable, e.g. `WEB_PORT`, `GATEWAY_PORT`). `OPENAI_API_KEY` is optional —
+without it the extract agent uses deterministic feature-hash embeddings, so the
+profile → match flow still works.
+
+The `ai-data-platform/migrations` are applied automatically the first time the
+`pgdata` volume is created; the gateway and extract agent create their own
+tables at startup.
+
+### Hybrid: postgres in Docker, services on the host
+
 Requires Docker (for Postgres/pgvector) and Node.js.
 
 ```bash

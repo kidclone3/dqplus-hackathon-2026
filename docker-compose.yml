@@ -1,21 +1,133 @@
+# Full VietNexus stack: postgres (pgvector) + gateway + matching-engine +
+# extract agent + Python matching API (ai-data-platform) + frontend (nginx).
+# Credentials default to the deal-flow-matchmaker ones (dealflow/dealflow).
+# Host port 5433 by default — the old deal-flow-matchmaker-postgres-1 container
+# still holds 5432 on this machine.
 services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: dqplus-postgres
     user: postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:-gateway}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-dealflow}
+      POSTGRES_USER: ${DB_USER:-dealflow}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-dealflow}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # ai-data-platform tables for the matching API — applied only on a fresh volume
+      - ./ai-data-platform/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-gateway}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-dealflow} -d ${DB_NAME:-dealflow}"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  gateway:
+    build: ./backend/gateway
+    container_name: dqplus-gateway
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-dealflow}
+      DB_USER: ${DB_USER:-dealflow}
+      DB_PASSWORD: ${DB_PASSWORD:-dealflow}
+      DB_SSL: "false"
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-a-real-environment}
+      JWT_EXPIRES_IN: 1d
+      EXTRACT_SERVICE_URL: http://extract:3003
+      MATCHING_API_URL: http://matching-api:8000
+    ports:
+      - "${GATEWAY_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  matching-engine:
+    build: ./backend/matching-engine
+    container_name: dqplus-matching-engine
+    environment:
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-dealflow}
+      DB_USER: ${DB_USER:-dealflow}
+      DB_PASSWORD: ${DB_PASSWORD:-dealflow}
+      DB_SSL: "false"
+      MATCH_VECTOR_WEIGHT: ${MATCH_VECTOR_WEIGHT:-0.7}
+      MATCH_ATTR_WEIGHT: ${MATCH_ATTR_WEIGHT:-0.3}
+      MATCH_CANDIDATE_POOL: ${MATCH_CANDIDATE_POOL:-50}
+      MATCHING_API_URL: http://matching-api:8000
+    ports:
+      - "${MATCHING_PORT:-3002}:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  extract:
+    build: ./backend/agent/extract
+    container_name: dqplus-extract
+    environment:
+      PORT: 3003
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-dealflow}
+      DB_USER: ${DB_USER:-dealflow}
+      DB_PASSWORD: ${DB_PASSWORD:-dealflow}
+      DB_SSL: "false"
+      # Empty key → deterministic feature-hash embedding fallback (no semantic
+      # embeddings, but the profile → match flow still works).
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://mkp-api.fptcloud.com}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
+    ports:
+      - "${EXTRACT_PORT:-3003}:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  matching-api:
+    build:
+      context: ./ai-data-platform
+      dockerfile: api/Dockerfile
+    container_name: dqplus-matching-api
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-dealflow}:${DB_PASSWORD:-dealflow}@postgres:5432/${DB_NAME:-dealflow}
+    ports:
+      - "${MATCHING_API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    container_name: dqplus-web
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    depends_on:
+      - gateway
+      - matching-engine
+      - extract
 
 volumes:
   pgdata:
