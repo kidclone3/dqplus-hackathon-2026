@@ -12,6 +12,6 @@ const proxy = {
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173, proxy },
-  preview: { port: 5173, proxy },
+  server: { port: 5173, proxy, allowedHosts: ['dqplus.ddns.net'] },
+  preview: { port: 5173, proxy, allowedHosts: ['dqplus.ddns.net'] },
 });
